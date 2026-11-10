@@ -1,0 +1,33 @@
+services:
+  postgres:
+    image: docker.io/library/postgres:16
+    container_name: notification-db
+    environment:
+      POSTGRES_USER: notification
+      POSTGRES_PASSWORD: notification
+      POSTGRES_DB: notification
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256 --auth-local=trust"
+    ports:
+      - "5432:5432"
+    volumes:
+      - notification-data:/var/lib/postgresql/data
+    command:
+      - postgres
+      - -c
+      - listen_addresses=*
+      - -c
+      - password_encryption=scram-sha-256
+      - -c
+      - max_connections=200
+      - -c
+      - timezone=UTC
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U notification -d notification
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  notification-data:
