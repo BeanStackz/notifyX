@@ -46,6 +46,16 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(ex.getMessage()));
     }
     
+    @ExceptionHandler (OrganizationSlugAlreadyExistsException.class)
+    public ResponseEntity<ApiResponse<Void>> handleOrganizationSlugAlreadyExists(
+                OrganizationSlugAlreadyExistsException ex
+    ) {
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(ApiResponse.error(ex.getMessage()));
+    }
+
+    
     @ExceptionHandler({
             BadCredentialsException.class,
             InvalidTokenException.class,
