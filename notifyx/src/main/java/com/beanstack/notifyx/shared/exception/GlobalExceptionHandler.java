@@ -97,6 +97,15 @@ public class GlobalExceptionHandler {
             .body(ApiResponse.error("You do not have permission to perform this action"));
     }
 
+    @ExceptionHandler (ApiKeyAlreadyRevokedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleApiKeyAlreadyRevoked(
+            ApiKeyAlreadyRevokedException ex
+    ) {
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(ApiResponse.error(ex.getMessage()));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleGeneral(
             Exception ex

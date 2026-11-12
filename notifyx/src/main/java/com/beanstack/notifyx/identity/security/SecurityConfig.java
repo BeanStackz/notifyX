@@ -10,6 +10,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 
+import com.beanstack.notifyx.apikey.security.ApiKeyAuthenticationFilter;
 import com.beanstack.notifyx.shared.response.ApiResponse;
 import tools.jackson.databind.ObjectMapper;
 
@@ -23,6 +24,7 @@ import lombok.RequiredArgsConstructor;
 public class SecurityConfig {
     
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final ApiKeyAuthenticationFilter apiKeyAuthenticationFilter;
     private final ObjectMapper objectMapper;
     
 
@@ -40,7 +42,9 @@ public class SecurityConfig {
                                 "/api/v1/auth/register",
                                 "/api/v1/auth/login",
                                 "/api/v1/auth/refresh"
+                                
                         ).permitAll()
+                .requestMatchers("/api/v1/ingest/**").authenticated()
                 .requestMatchers(
                     HttpMethod.POST,
                     "/api/v1/auth/logout"
@@ -62,7 +66,14 @@ public class SecurityConfig {
                             ApiResponse.error("Access denied"));
                     })
             )
-            .addFilterBefore(jwtAuthenticationFilter, org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class);
+            .addFilterBefore(
+                apiKeyAuthenticationFilter,
+                org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class
+            )
+            .addFilterBefore(
+                jwtAuthenticationFilter,
+                org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class
+            );
         return http.build();
     }
 }
