@@ -55,6 +55,15 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(ex.getMessage()));
     }
 
+    @ExceptionHandler (ProjectSlugAlreadyExistsException.class)
+    public ResponseEntity<ApiResponse<Void>> handleProjectSlugAlreadyExists(
+                ProjectSlugAlreadyExistsException ex
+    ) {
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(ApiResponse.error(ex.getMessage()));
+ }
+
     
     @ExceptionHandler({
             BadCredentialsException.class,
@@ -67,6 +76,25 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.UNAUTHORIZED)
                 .body(ApiResponse.error(exception.getMessage()));
+    }
+
+    @ExceptionHandler (ProjectArchivedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleProjectArchived(
+            ProjectArchivedException ex
+    ) {
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(ApiResponse.error(ex.getMessage()));
+    }
+    @ExceptionHandler(
+        org.springframework.security.access.AccessDeniedException.class
+    )
+    public ResponseEntity<ApiResponse<Void>> handleAccessDenied(
+            org.springframework.security.access.AccessDeniedException exception
+    ) {
+    return ResponseEntity
+            .status(HttpStatus.FORBIDDEN)
+            .body(ApiResponse.error("You do not have permission to perform this action"));
     }
 
     @ExceptionHandler(Exception.class)
