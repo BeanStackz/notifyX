@@ -6,11 +6,20 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.beanstack.notifyx.shared.response.ApiResponse;
+import com.beanstack.notifyx.subscription.exception.ActiveSubscriptionAlreadyExistsException;
+import com.beanstack.notifyx.subscription.exception.NoActiveSubscriptionException;
+import com.beanstack.notifyx.subscription.exception.SubscriptionQuotaExceededException;
+import com.beanstack.notifyx.subscription.exception.UnsupportedNotificationChannelException;
 
 @RestControllerAdvice 
 public class GlobalExceptionHandler {
+
+    private static final Logger LOGGER =
+            LoggerFactory.getLogger(GlobalExceptionHandler.class);
     
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleNotFound(
@@ -106,10 +115,52 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(ex.getMessage()));
     }
 
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ApiResponse<Void>> handleBadRequest(
+        IllegalArgumentException exception
+        ) {
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.error(exception.getMessage()));
+        }
+
+    @ExceptionHandler(ActiveSubscriptionAlreadyExistsException.class)
+        public ResponseEntity<ApiResponse<Void>> handleActiveSubscriptionExists(
+        ActiveSubscriptionAlreadyExistsException exception
+        ) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.error(exception.getMessage()));
+        }
+
+        @ExceptionHandler(NoActiveSubscriptionException.class)
+        public ResponseEntity<ApiResponse<Void>> handleNoActiveSubscription(
+        NoActiveSubscriptionException exception
+        ) {
+        return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED)
+                .body(ApiResponse.error(exception.getMessage()));
+        }
+
+        @ExceptionHandler(SubscriptionQuotaExceededException.class)
+        public ResponseEntity<ApiResponse<Void>> handleQuotaExceeded(
+        SubscriptionQuotaExceededException exception
+        ) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .body(ApiResponse.error(exception.getMessage()));
+        }
+
+        @ExceptionHandler(UnsupportedNotificationChannelException.class)
+        public ResponseEntity<ApiResponse<Void>> handleUnsupportedChannel(
+        UnsupportedNotificationChannelException exception
+        ) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(exception.getMessage()));
+        }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleGeneral(
             Exception ex
     ) {
+        LOGGER.error("Unhandled exception while processing request", ex);
+
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.error("An unexpected error occurred"));

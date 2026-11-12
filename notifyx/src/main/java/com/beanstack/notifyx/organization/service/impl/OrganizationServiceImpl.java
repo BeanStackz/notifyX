@@ -19,6 +19,7 @@ import com.beanstack.notifyx.organization.repository.OrganizationRepository;
 import com.beanstack.notifyx.organization.service.OrganizationService;
 import com.beanstack.notifyx.shared.exception.OrganizationSlugAlreadyExistsException;
 import com.beanstack.notifyx.shared.exception.ResourceNotFoundException;
+import com.beanstack.notifyx.subscription.service.DefaultSubscriptionProvisioner;
 
 import lombok.RequiredArgsConstructor;
 
@@ -29,6 +30,8 @@ public class OrganizationServiceImpl implements OrganizationService {
     private final OrganizationRepository organizationRepository;
     private final OrganizationMemberRepository organizationMemberRepository;
     private final UserRepository userRepository;
+
+    private final DefaultSubscriptionProvisioner subscriptionProvisioner;
     
     
     @Override
@@ -51,6 +54,7 @@ public class OrganizationServiceImpl implements OrganizationService {
             .build();
 
         Organization savedOrganization = organizationRepository.save(organization);
+        subscriptionProvisioner.assignFreePlan(savedOrganization);
 
         OrganizationMember organizationMember = OrganizationMember.builder()
             .organization(savedOrganization)
