@@ -23,6 +23,7 @@ import tools.jackson.databind.JsonNode;
 public class EmailProvider implements NotificationProvider {
 
     private final BrevoProperties properties;
+    private final EmailTemplateRenderer templateRenderer;
 
     @Override
     public NotificationChannel getChannel() {
@@ -42,7 +43,8 @@ public class EmailProvider implements NotificationProvider {
                 Map.of("email", notification.getRecipient())
             },
             "subject", subject(notification),
-            "htmlContent", htmlContent(notification.getContent())
+            "htmlContent", templateRenderer.render(notification),
+            "textContent", notification.getContent()
         );
 
         JsonNode response = RestClient.builder()
@@ -81,15 +83,6 @@ public class EmailProvider implements NotificationProvider {
             notification.getSubject().isBlank()
             ? "NotifyX notification"
             : notification.getSubject();
-    }
-
-    private String htmlContent(String content) {
-        return "<p>" + content
-            .replace("&", "&amp;")
-            .replace("<", "&lt;")
-            .replace(">", "&gt;")
-            .replace("\r\n", "<br>")
-            .replace("\n", "<br>") + "</p>";
     }
 
     private boolean isBlank(String value) {

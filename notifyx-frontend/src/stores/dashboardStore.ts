@@ -32,7 +32,7 @@ type DashboardState = {
   createApiKey: (accessToken: string, organizationId: string, projectId: string, name: string, expiresInDays: number | null) => Promise<void>
   revokeApiKey: (accessToken: string, organizationId: string, projectId: string, apiKeyId: string) => Promise<void>
   clearNewApiKey: () => void
-  sendNotification: (apiKey: string, projectId: string, request: { channel: string; recipient: string; subject?: string; content: string; metadata?: Record<string, string>; scheduledAt?: string }) => Promise<NotificationResponse>
+  sendNotification: (apiKey: string, projectId: string, request: { channel: string; recipient: string; subject?: string; content: string; metadata?: Record<string, unknown>; scheduledAt?: string }) => Promise<NotificationResponse>
   loadDeliveryTracking: (accessToken: string, projectId: string, notificationId: string) => Promise<DeliveryTracking>
   loadNotificationHistory: (accessToken: string, projectId: string) => Promise<void>
   retryNotification: (accessToken: string, projectId: string, notificationId: string) => Promise<void>
@@ -52,6 +52,17 @@ async function loadOrganizationData(accessToken: string, organizationId: string)
     apiRequest<Subscription>(`/api/v1/organizations/${organizationId}/subscription`, {}, accessToken).catch(() => null),
   ])
   return { projects, subscription }
+}
+
+async function loadProjectApiKeys(accessToken: string, organizationId: string, projects: Project[]) {
+  const apiKeyResults = await Promise.all(projects.map(async (project) => {
+    try {
+      return await apiRequest<ApiKey[]>(`/api/v1/organizations/${organizationId}/projects/${project.id}/api-keys`, {}, accessToken)
+    } catch {
+      return []
+    }
+  }))
+  return apiKeyResults.flat()
 }
 
 export const useDashboardStore = create<DashboardState>((set) => ({
@@ -86,7 +97,10 @@ export const useDashboardStore = create<DashboardState>((set) => ({
         ? currentOrganizationId
         : organizations[0]?.id ?? null
       const organizationData = organizationId ? await loadOrganizationData(accessToken, organizationId) : { projects: [], subscription: null }
-      set({ organizations, selectedOrganizationId: organizationId, plans, ...organizationData, isLoading: false })
+      set({ organizations, selectedOrganizationId: organizationId, plans, ...organizationData, apiKeys: [], isLoading: false })
+      if (organizationId && organizationData.projects.length) {
+        void loadProjectApiKeys(accessToken, organizationId, organizationData.projects).then((apiKeys) => set({ apiKeys }))
+      }
     } catch (error) {
       set({ isLoading: false, error: error instanceof Error ? error.message : 'Unable to load dashboard data.' })
     }
@@ -95,7 +109,8 @@ export const useDashboardStore = create<DashboardState>((set) => ({
     set({ isLoading: true, error: null })
     try {
       const organizationData = await loadOrganizationData(accessToken, organizationId)
-      set({ selectedOrganizationId: organizationId, ...organizationData, isLoading: false })
+      set({ selectedOrganizationId: organizationId, ...organizationData, apiKeys: [], isLoading: false })
+      void loadProjectApiKeys(accessToken, organizationId, organizationData.projects).then((apiKeys) => set({ apiKeys }))
     } catch (error) {
       set({ isLoading: false, error: error instanceof Error ? error.message : 'Unable to switch organization.' })
     }

@@ -25,6 +25,28 @@ public interface NotificationRepository
     List<Notification> findByProject_IdOrderByCreatedAtDesc(UUID projectId);
 
     @Query("""
+        select n
+        from Notification n
+        join fetch n.project p
+        join fetch p.organization
+        where n.id = :notificationId
+        """)
+    Optional<Notification> findWithProjectAndOrganizationById(
+        @Param("notificationId") UUID notificationId
+    );
+
+    @Query("""
+        select n
+        from Notification n
+        join fetch n.project
+        where n.project.id = :projectId
+        order by n.createdAt desc
+        """)
+    List<Notification> findAllWithProjectByProjectIdOrderByCreatedAtDesc(
+        @Param("projectId") UUID projectId
+    );
+
+    @Query("""
         select n.status, count(n)
         from Notification n
         where n.project.organization.id = :organizationId

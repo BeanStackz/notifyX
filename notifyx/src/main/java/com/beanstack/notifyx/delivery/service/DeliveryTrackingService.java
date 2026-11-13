@@ -88,7 +88,7 @@ public class DeliveryTrackingService {
     ) {
         verifyProjectAccess(projectId, email);
         return notificationRepository
-            .findByProject_IdOrderByCreatedAtDesc(projectId)
+            .findAllWithProjectByProjectIdOrderByCreatedAtDesc(projectId)
             .stream()
             .map(value -> new NotificationResponse(
                 value.getId(),
@@ -116,7 +116,8 @@ public class DeliveryTrackingService {
                 value.getOrganization().getId(), user.getId()
             ))
             .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
-        var notification = notificationRepository.findById(notificationId)
+        var notification = notificationRepository
+            .findWithProjectAndOrganizationById(notificationId)
             .filter(value -> value.getProject().getId().equals(project.getId()))
             .orElseThrow(() -> new ResourceNotFoundException("Notification not found"));
 

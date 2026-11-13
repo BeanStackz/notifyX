@@ -33,7 +33,8 @@ public class NotificationDeliveryService {
             return null;
         }
 
-        Notification notification = notificationRepository.findById(notificationId)
+        Notification notification = notificationRepository
+            .findWithProjectAndOrganizationById(notificationId)
             .orElseThrow(() -> new IllegalArgumentException("Notification not found"));
         if (notification.getStatus() == NotificationStatus.SENT) {
             idempotencyService.complete(eventId);
