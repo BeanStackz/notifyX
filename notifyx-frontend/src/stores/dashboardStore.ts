@@ -41,7 +41,7 @@ type DashboardState = {
   clearCheckout: () => void
   cancelSubscription: (accessToken: string, organizationId: string) => Promise<void>
   loadHealth: (accessToken: string) => Promise<void>
-  loadAnalytics: (accessToken: string, organizationId: string) => Promise<void>
+  loadAnalytics: (accessToken: string, organizationId: string, days?: number) => Promise<void>
   loadAdminDashboard: (accessToken: string) => Promise<void>
   updateProfile: (accessToken: string, fullName: string) => Promise<User>
 }
@@ -286,9 +286,9 @@ export const useDashboardStore = create<DashboardState>((set) => ({
       set({ health: null, error: error instanceof Error ? error.message : 'Unable to load platform health.' })
     }
   },
-  loadAnalytics: async (accessToken, organizationId) => {
+  loadAnalytics: async (accessToken, organizationId, days = 30) => {
     try {
-      const analytics = await apiRequest<UsageAnalytics>(`/api/v1/organizations/${organizationId}/analytics`, {}, accessToken)
+      const analytics = await apiRequest<UsageAnalytics>(`/api/v1/organizations/${organizationId}/analytics?days=${days}`, {}, accessToken)
       set({ analytics })
     } catch (error) {
       set({ analytics: null, error: error instanceof Error ? error.message : 'Unable to load usage analytics.' })

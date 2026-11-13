@@ -3,6 +3,7 @@ package com.beanstack.notifyx.notification.repository;
 import java.util.Optional;
 import java.util.List;
 import java.util.UUID;
+import java.time.Instant;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -40,4 +41,20 @@ public interface NotificationRepository
     List<Object[]> countByChannelForOrganization(@Param("organizationId") UUID organizationId);
 
     long countByProject_Organization_Id(UUID organizationId);
+
+    @Query(value = """
+        select cast(n.created_at as date) as notification_day, count(*) as notification_count
+        from notifications n
+        join projects p on p.id = n.project_id
+        where p.organization_id = :organizationId
+          and n.created_at >= :from
+          and n.created_at < :to
+        group by cast(n.created_at as date)
+        order by notification_day
+        """, nativeQuery = true)
+    List<Object[]> countDailyForOrganization(
+        @Param("organizationId") UUID organizationId,
+        @Param("from") Instant from,
+        @Param("to") Instant to
+    );
 }
