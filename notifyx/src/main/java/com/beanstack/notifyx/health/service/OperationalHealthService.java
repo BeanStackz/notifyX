@@ -4,8 +4,10 @@ import java.time.Instant;
 import java.util.Properties;
 
 import org.springframework.amqp.core.AmqpAdmin;
+import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.rabbit.connection.Connection;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 
 import com.beanstack.notifyx.delivery.config.BrevoProperties;
@@ -29,8 +31,8 @@ public class OperationalHealthService {
         String rabbitMqStatus = "DOWN";
         try (Connection connection = connectionFactory.createConnection()) {
             rabbitMqStatus = connection.isOpen() ? "UP" : "DOWN";
-        } catch (RuntimeException ignored) {
-            // Health is reported as DOWN while the rest of the authenticated API remains available.
+        } catch (AmqpException exception) {
+            rabbitMqStatus = "DOWN";
         }
 
         long deadLetterQueueCount = 0;
@@ -40,12 +42,17 @@ public class OperationalHealthService {
                 Object count = properties.get("QUEUE_MESSAGE_COUNT");
                 if (count instanceof Number number) deadLetterQueueCount = number.longValue();
             }
-        } catch (RuntimeException ignored) {
-            // A missing/unreachable queue is represented as zero with RabbitMQ marked separately.
+        } catch (AmqpException exception) {
+            deadLetterQueueCount = -1;
         }
 
-        long outboxBacklog = outboxRepository.countByStatus(OutboxStatus.PENDING)
-            + outboxRepository.countByStatus(OutboxStatus.PROCESSING);
+        long outboxBacklog;
+        try {
+            outboxBacklog = outboxRepository.countByStatus(OutboxStatus.PENDING)
+                + outboxRepository.countByStatus(OutboxStatus.PROCESSING);
+        } catch (DataAccessException exception) {
+            outboxBacklog = -1;
+        }
         String brevoStatus = isConfigured() ? "CONFIGURED" : "NOT_CONFIGURED";
 
         return new OperationalHealthResponse(
