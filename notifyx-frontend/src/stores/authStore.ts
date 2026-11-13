@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { apiRequest } from '../lib/api'
-import { clearStoredAuth, getStoredAccessToken, getStoredRefreshToken, getStoredUser, saveAuthResponse } from '../lib/authStorage'
+import { clearStoredAuth, getStoredAccessToken, getStoredRefreshToken, getStoredUser, saveAuthResponse, saveStoredUser } from '../lib/authStorage'
 import type { AuthResponse, User } from '../lib/types'
 
 type AuthState = {
@@ -13,6 +13,7 @@ type AuthState = {
   register: (fullName: string, email: string, password: string) => Promise<void>
   logout: () => Promise<void>
   clearError: () => void
+  setUser: (user: User) => void
 }
 
 function saveAuth(auth: AuthResponse) {
@@ -57,6 +58,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
   clearError: () => set({ error: null }),
+  setUser: (user) => { saveStoredUser(user); set({ user }) },
 }))
 
 window.addEventListener('notifyx:auth-refreshed', (event) => {

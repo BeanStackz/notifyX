@@ -9,9 +9,12 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.beanstack.notifyx.outbox.entity.OutboxEvent;
+import com.beanstack.notifyx.outbox.entity.OutboxStatus;
 
 public interface OutboxEventRepository
     extends JpaRepository<OutboxEvent, UUID> {
+
+    long countByStatus(OutboxStatus status);
 
         @Query(value = """
         SELECT *

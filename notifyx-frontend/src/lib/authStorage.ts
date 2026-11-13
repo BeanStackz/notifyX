@@ -10,6 +10,10 @@ export function saveAuthResponse(auth: AuthResponse) {
   localStorage.setItem(USER_KEY, JSON.stringify(auth.user))
 }
 
+export function saveStoredUser(user: User) {
+  localStorage.setItem(USER_KEY, JSON.stringify(user))
+}
+
 export function clearStoredAuth() {
   localStorage.removeItem(ACCESS_TOKEN_KEY)
   localStorage.removeItem(REFRESH_TOKEN_KEY)

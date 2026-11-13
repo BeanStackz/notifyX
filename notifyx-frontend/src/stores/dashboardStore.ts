@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { apiRequest } from '../lib/api'
-import type { ApiKey, CreatedApiKey, DeliveryTracking, NotificationResponse, Organization, Plan, Project, Subscription, SubscriptionCheckout } from '../lib/types'
+import type { AdminDashboard, ApiKey, CreatedApiKey, DeliveryTracking, NotificationResponse, OperationalHealth, Organization, Plan, Project, Subscription, SubscriptionCheckout, UsageAnalytics, User } from '../lib/types'
 
 type DashboardState = {
   organizations: Organization[]
@@ -13,8 +13,13 @@ type DashboardState = {
   lastNotification: NotificationResponse | null
   deliveryTracking: DeliveryTracking | null
   trackingLoading: boolean
+  notificationHistory: NotificationResponse[]
+  historyLoading: boolean
   checkout: SubscriptionCheckout | null
   subscriptionMessage: string | null
+  health: OperationalHealth | null
+  analytics: UsageAnalytics | null
+  adminDashboard: AdminDashboard | null
   isLoading: boolean
   error: string | null
   load: (accessToken: string) => Promise<void>
@@ -29,9 +34,16 @@ type DashboardState = {
   clearNewApiKey: () => void
   sendNotification: (apiKey: string, projectId: string, request: { channel: string; recipient: string; subject?: string; content: string; metadata?: Record<string, string>; scheduledAt?: string }) => Promise<NotificationResponse>
   loadDeliveryTracking: (accessToken: string, projectId: string, notificationId: string) => Promise<DeliveryTracking>
+  loadNotificationHistory: (accessToken: string, projectId: string) => Promise<void>
+  retryNotification: (accessToken: string, projectId: string, notificationId: string) => Promise<void>
   createCheckout: (accessToken: string, organizationId: string, planCode: string) => Promise<void>
   verifyCheckout: (accessToken: string, organizationId: string, orderId: string, paymentId: string, signature: string) => Promise<void>
   clearCheckout: () => void
+  cancelSubscription: (accessToken: string, organizationId: string) => Promise<void>
+  loadHealth: (accessToken: string) => Promise<void>
+  loadAnalytics: (accessToken: string, organizationId: string) => Promise<void>
+  loadAdminDashboard: (accessToken: string) => Promise<void>
+  updateProfile: (accessToken: string, fullName: string) => Promise<User>
 }
 
 async function loadOrganizationData(accessToken: string, organizationId: string) {
@@ -53,8 +65,13 @@ export const useDashboardStore = create<DashboardState>((set) => ({
   lastNotification: null,
   deliveryTracking: null,
   trackingLoading: false,
+  notificationHistory: [],
+  historyLoading: false,
   checkout: null,
   subscriptionMessage: null,
+  health: null,
+  analytics: null,
+  adminDashboard: null,
   isLoading: false,
   error: null,
   load: async (accessToken) => {
@@ -206,6 +223,22 @@ export const useDashboardStore = create<DashboardState>((set) => ({
       throw error
     }
   },
+  loadNotificationHistory: async (accessToken, projectId) => {
+    set({ historyLoading: true })
+    try {
+      const notificationHistory = await apiRequest<NotificationResponse[]>(`/api/v1/projects/${projectId}/notifications`, {}, accessToken)
+      set({ notificationHistory, historyLoading: false })
+    } catch (error) {
+      set({ historyLoading: false })
+      throw error
+    }
+  },
+  retryNotification: async (accessToken, projectId, notificationId) => {
+    await apiRequest<void>(`/api/v1/projects/${projectId}/notifications/${notificationId}/retry`, {
+      method: 'POST',
+    }, accessToken)
+    await useDashboardStore.getState().loadNotificationHistory(accessToken, projectId)
+  },
   createCheckout: async (accessToken, organizationId, planCode) => {
     set({ isLoading: true, error: null, subscriptionMessage: null })
     try {
@@ -234,4 +267,52 @@ export const useDashboardStore = create<DashboardState>((set) => ({
     }
   },
   clearCheckout: () => set({ checkout: null, subscriptionMessage: null }),
+  cancelSubscription: async (accessToken, organizationId) => {
+    set({ isLoading: true, error: null })
+    try {
+      await apiRequest<void>(`/api/v1/organizations/${organizationId}/subscription/cancel`, { method: 'POST' }, accessToken)
+      const subscription = await apiRequest<Subscription>(`/api/v1/organizations/${organizationId}/subscription`, {}, accessToken)
+      set({ subscription, subscriptionMessage: 'Cancellation scheduled for the end of the current billing period.', isLoading: false })
+    } catch (error) {
+      set({ isLoading: false, error: error instanceof Error ? error.message : 'Unable to cancel the subscription.' })
+      throw error
+    }
+  },
+  loadHealth: async (accessToken) => {
+    try {
+      const health = await apiRequest<OperationalHealth>('/api/v1/health/operations', {}, accessToken)
+      set({ health })
+    } catch (error) {
+      set({ health: null, error: error instanceof Error ? error.message : 'Unable to load platform health.' })
+    }
+  },
+  loadAnalytics: async (accessToken, organizationId) => {
+    try {
+      const analytics = await apiRequest<UsageAnalytics>(`/api/v1/organizations/${organizationId}/analytics`, {}, accessToken)
+      set({ analytics })
+    } catch (error) {
+      set({ analytics: null, error: error instanceof Error ? error.message : 'Unable to load usage analytics.' })
+    }
+  },
+  loadAdminDashboard: async (accessToken) => {
+    try {
+      const adminDashboard = await apiRequest<AdminDashboard>('/api/v1/admin/dashboard', {}, accessToken)
+      set({ adminDashboard })
+    } catch (error) {
+      set({ adminDashboard: null, error: error instanceof Error ? error.message : 'Unable to load admin dashboard.' })
+    }
+  },
+  updateProfile: async (accessToken, fullName) => {
+    try {
+      const user = await apiRequest<User>('/api/v1/users/profile', {
+        method: 'PUT',
+        body: JSON.stringify({ fullName }),
+      }, accessToken)
+      set({ isLoading: false })
+      return user
+    } catch (error) {
+      set({ isLoading: false, error: error instanceof Error ? error.message : 'Unable to update your profile.' })
+      throw error
+    }
+  },
 }))
