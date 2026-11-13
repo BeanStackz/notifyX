@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { apiRequest } from '../lib/api'
-import type { Organization, Plan, Project, Subscription } from '../lib/types'
+import type { ApiKey, CreatedApiKey, DeliveryTracking, NotificationResponse, Organization, Plan, Project, Subscription, SubscriptionCheckout } from '../lib/types'
 
 type DashboardState = {
   organizations: Organization[]
@@ -8,6 +8,13 @@ type DashboardState = {
   projects: Project[]
   plans: Plan[]
   subscription: Subscription | null
+  apiKeys: ApiKey[]
+  newlyCreatedApiKey: CreatedApiKey | null
+  lastNotification: NotificationResponse | null
+  deliveryTracking: DeliveryTracking | null
+  trackingLoading: boolean
+  checkout: SubscriptionCheckout | null
+  subscriptionMessage: string | null
   isLoading: boolean
   error: string | null
   load: (accessToken: string) => Promise<void>
@@ -16,6 +23,15 @@ type DashboardState = {
   createProject: (accessToken: string, organizationId: string, name: string, slug: string, description: string) => Promise<void>
   updateProject: (accessToken: string, organizationId: string, projectId: string, name: string, slug: string, description: string) => Promise<void>
   archiveProject: (accessToken: string, organizationId: string, projectId: string) => Promise<void>
+  loadApiKeys: (accessToken: string, organizationId: string, projectId: string) => Promise<void>
+  createApiKey: (accessToken: string, organizationId: string, projectId: string, name: string, expiresInDays: number | null) => Promise<void>
+  revokeApiKey: (accessToken: string, organizationId: string, projectId: string, apiKeyId: string) => Promise<void>
+  clearNewApiKey: () => void
+  sendNotification: (apiKey: string, projectId: string, request: { channel: string; recipient: string; subject?: string; content: string; metadata?: Record<string, string>; scheduledAt?: string }) => Promise<NotificationResponse>
+  loadDeliveryTracking: (accessToken: string, projectId: string, notificationId: string) => Promise<DeliveryTracking>
+  createCheckout: (accessToken: string, organizationId: string, planCode: string) => Promise<void>
+  verifyCheckout: (accessToken: string, organizationId: string, orderId: string, paymentId: string, signature: string) => Promise<void>
+  clearCheckout: () => void
 }
 
 async function loadOrganizationData(accessToken: string, organizationId: string) {
@@ -32,6 +48,13 @@ export const useDashboardStore = create<DashboardState>((set) => ({
   projects: [],
   plans: [],
   subscription: null,
+  apiKeys: [],
+  newlyCreatedApiKey: null,
+  lastNotification: null,
+  deliveryTracking: null,
+  trackingLoading: false,
+  checkout: null,
+  subscriptionMessage: null,
   isLoading: false,
   error: null,
   load: async (accessToken) => {
@@ -115,4 +138,100 @@ export const useDashboardStore = create<DashboardState>((set) => ({
       throw error
     }
   },
+  loadApiKeys: async (accessToken, organizationId, projectId) => {
+    set({ isLoading: true, error: null })
+    try {
+      const apiKeys = await apiRequest<ApiKey[]>(`/api/v1/organizations/${organizationId}/projects/${projectId}/api-keys`, {}, accessToken)
+      set({ apiKeys, isLoading: false })
+    } catch (error) {
+      set({ isLoading: false, error: error instanceof Error ? error.message : 'Unable to load API keys.' })
+    }
+  },
+  createApiKey: async (accessToken, organizationId, projectId, name, expiresInDays) => {
+    set({ isLoading: true, error: null, newlyCreatedApiKey: null })
+    try {
+      const createdApiKey = await apiRequest<CreatedApiKey>(`/api/v1/organizations/${organizationId}/projects/${projectId}/api-keys`, {
+        method: 'POST',
+        body: JSON.stringify({ name, expiresInDays }),
+      }, accessToken)
+      const listedKey: ApiKey = {
+        ...createdApiKey,
+        lastUsedAt: null,
+        revokedAt: null,
+      }
+      set((state) => ({ apiKeys: [...state.apiKeys, listedKey], newlyCreatedApiKey: createdApiKey, isLoading: false }))
+    } catch (error) {
+      set({ isLoading: false, error: error instanceof Error ? error.message : 'Unable to create API key.' })
+      throw error
+    }
+  },
+  revokeApiKey: async (accessToken, organizationId, projectId, apiKeyId) => {
+    set({ isLoading: true, error: null })
+    try {
+      const revokedKey = await apiRequest<ApiKey>(`/api/v1/organizations/${organizationId}/projects/${projectId}/api-keys/${apiKeyId}`, { method: 'DELETE' }, accessToken)
+      set((state) => ({ apiKeys: state.apiKeys.map((key) => key.id === apiKeyId ? revokedKey : key), isLoading: false }))
+    } catch (error) {
+      set({ isLoading: false, error: error instanceof Error ? error.message : 'Unable to revoke API key.' })
+      throw error
+    }
+  },
+  clearNewApiKey: () => set({ newlyCreatedApiKey: null }),
+  sendNotification: async (apiKey, projectId, request) => {
+    set({ isLoading: true, error: null, lastNotification: null })
+    try {
+      const notification = await apiRequest<NotificationResponse>('/api/v1/ingest/notifications', {
+        method: 'POST',
+        headers: {
+          'X-NotifyX-API-Key': apiKey,
+          'Idempotency-Key': crypto.randomUUID(),
+        },
+        body: JSON.stringify(request),
+      })
+      if (notification.projectId !== projectId) throw new Error('The notification was returned for a different project.')
+      set({ isLoading: false, lastNotification: notification, deliveryTracking: null })
+      return notification
+    } catch (error) {
+      set({ isLoading: false, error: error instanceof Error ? error.message : 'Unable to send notification.' })
+      throw error
+    }
+  },
+  loadDeliveryTracking: async (accessToken, projectId, notificationId) => {
+    set({ trackingLoading: true })
+    try {
+      const tracking = await apiRequest<DeliveryTracking>(`/api/v1/projects/${projectId}/notifications/${notificationId}`, {}, accessToken)
+      set({ deliveryTracking: tracking, trackingLoading: false })
+      return tracking
+    } catch (error) {
+      set({ trackingLoading: false })
+      throw error
+    }
+  },
+  createCheckout: async (accessToken, organizationId, planCode) => {
+    set({ isLoading: true, error: null, subscriptionMessage: null })
+    try {
+      const checkout = await apiRequest<SubscriptionCheckout>(`/api/v1/organizations/${organizationId}/billing/checkout`, {
+        method: 'POST',
+        body: JSON.stringify({ planCode }),
+      }, accessToken)
+      set({ checkout, isLoading: false })
+    } catch (error) {
+      set({ isLoading: false, error: error instanceof Error ? error.message : 'Unable to start checkout.' })
+      throw error
+    }
+  },
+  verifyCheckout: async (accessToken, organizationId, orderId, paymentId, signature) => {
+    set({ isLoading: true, error: null })
+    try {
+      await apiRequest<void>(`/api/v1/organizations/${organizationId}/billing/verify`, {
+        method: 'POST',
+        body: JSON.stringify({ razorpayOrderId: orderId, razorpayPaymentId: paymentId, razorpaySignature: signature }),
+      }, accessToken)
+      set({ isLoading: false, subscriptionMessage: 'Payment signature verified. Refreshing your subscription…' })
+      window.location.reload()
+    } catch (error) {
+      set({ isLoading: false, error: error instanceof Error ? error.message : 'Unable to verify payment.' })
+      throw error
+    }
+  },
+  clearCheckout: () => set({ checkout: null, subscriptionMessage: null }),
 }))

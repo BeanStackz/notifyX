@@ -76,14 +76,6 @@ public class NotificationServiceImpl implements NotificationService {
         var existing = notificationRepository
             .findByProject_IdAndIdempotencyKey(projectId, idempotencyKey);
 
-        
-
-        NotificationPriority priority =
-            subscriptionService.reserveNotificationQuota(
-                project.getOrganization().getId(),
-                request.channel()
-        );
-
         if (existing.isPresent()) {
             Notification notification = existing.get();
 
@@ -95,6 +87,12 @@ public class NotificationServiceImpl implements NotificationService {
 
             return toResponse(notification);
         }
+
+        NotificationPriority priority =
+            subscriptionService.reserveNotificationQuota(
+                project.getOrganization().getId(),
+                request.channel()
+            );
 
 
         Instant now = Instant.now();

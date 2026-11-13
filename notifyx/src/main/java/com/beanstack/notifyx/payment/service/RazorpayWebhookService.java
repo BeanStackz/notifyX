@@ -26,6 +26,10 @@ import com.beanstack.notifyx.subscription.entity.SubscriptionUsage;
 import com.beanstack.notifyx.subscription.repository.OrganizationSubscriptionRepository;
 import com.beanstack.notifyx.subscription.repository.SubscriptionUsageRepository;
 import com.beanstack.notifyx.subscription.service.DefaultSubscriptionProvisioner;
+import com.beanstack.notifyx.subscription.service.SubscriptionService;
+import com.beanstack.notifyx.payment.entity.BillingOrder;
+import com.beanstack.notifyx.payment.entity.BillingOrderStatus;
+import com.beanstack.notifyx.payment.repository.BillingOrderRepository;
 
 import lombok.RequiredArgsConstructor;
 import tools.jackson.databind.JsonNode;
@@ -44,6 +48,8 @@ public class RazorpayWebhookService {
     private final PaymentRepository paymentRepository;
 
     private final DefaultSubscriptionProvisioner freeProvisioner;
+    private final BillingOrderRepository billingOrderRepository;
+    private final SubscriptionService subscriptionService;
 
     @Transactional
     public void process(
@@ -62,7 +68,7 @@ public class RazorpayWebhookService {
         try {
             JsonNode root = objectMapper.readTree(rawBody);
 
-            String eventType = root.path("event").asText();
+            String eventType = root.path("event").asString();
 
             if (eventType.isBlank()) {
                 throw new IllegalArgumentException(
@@ -82,7 +88,14 @@ public class RazorpayWebhookService {
                 return;
             }
 
-            processSubscriptionEvent(root, eventType);
+            if ("payment.captured".equals(eventType) ||
+                "order.paid".equals(eventType)) {
+                confirmOrderPayment(root);
+            } else if ("payment.failed".equals(eventType)) {
+                recordFailedPayment(root);
+            } else {
+                processSubscriptionEvent(root, eventType);
+            }
 
             RazorpayWebhookEvent webhook =
                 webhookRepository.findByEventId(eventId)
@@ -99,6 +112,37 @@ public class RazorpayWebhookService {
         }
     }
 
+    private void recordFailedPayment(JsonNode root) {
+        JsonNode payment = root
+            .path("payload")
+            .path("payment")
+            .path("entity");
+
+        String paymentId = payment.path("id").asString();
+        String razorpayOrderId = payment.path("order_id").asString();
+
+        if (paymentId.isBlank() || razorpayOrderId.isBlank() ||
+            billingOrderRepository.existsByRazorpayPaymentId(paymentId)) {
+            return;
+        }
+
+        billingOrderRepository.findByRazorpayOrderId(razorpayOrderId)
+            .ifPresent(order -> order.setStatus(BillingOrderStatus.FAILED));
+    }
+
+    private void confirmOrderPayment(JsonNode root) {
+        JsonNode payment = root.path("payload").path("payment").path("entity");
+        JsonNode order = root.path("payload").path("order").path("entity");
+        String paymentId = payment.path("id").asString();
+        String orderId = payment.path("order_id").asString(
+            order.path("id").asString()
+        );
+        BillingOrder billingOrder = billingOrderRepository
+            .findByRazorpayOrderId(orderId)
+            .orElseThrow(() -> new IllegalStateException("Billing order not found"));
+        subscriptionService.confirmOrderPayment(billingOrder.getId(), paymentId);
+    }
+
     private void processSubscriptionEvent(
         JsonNode root,
         String eventType
@@ -109,7 +153,7 @@ public class RazorpayWebhookService {
             .path("entity");
 
         String razorpaySubscriptionId =
-            subscriptionEntity.path("id").asText();
+            subscriptionEntity.path("id").asString();
 
         if (razorpaySubscriptionId.isBlank()) {
             return;
@@ -236,7 +280,7 @@ public class RazorpayWebhookService {
             .path("payment")
             .path("entity");
 
-        String paymentId = payment.path("id").asText();
+        String paymentId = payment.path("id").asString();
 
         if (paymentId.isBlank() ||
             paymentRepository.existsByRazorpayPaymentId(paymentId)) {
@@ -248,7 +292,7 @@ public class RazorpayWebhookService {
                 .subscription(subscription)
                 .razorpayPaymentId(paymentId)
                 .amountInPaise(payment.path("amount").asLong())
-                .currency(payment.path("currency").asText("INR"))
+                .currency(payment.path("currency").asString("INR"))
                 .status(PaymentStatus.CAPTURED)
                 .build()
         );

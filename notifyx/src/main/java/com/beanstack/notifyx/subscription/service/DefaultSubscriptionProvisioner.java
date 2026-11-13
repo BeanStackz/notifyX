@@ -33,6 +33,21 @@ public class DefaultSubscriptionProvisioner {
                 new IllegalStateException("FREE plan is not configured")
             );
 
+        var existing = subscriptionRepository
+            .findFirstByOrganization_IdAndStatusOrderByCreatedAtDesc(
+                organization.getId(),
+                SubscriptionStatus.ACTIVE
+            );
+
+        if (existing.isPresent() &&
+            "FREE".equals(existing.get().getPlan().getCode())) {
+            return existing.get();
+        }
+
+        existing.ifPresent(subscription ->
+            subscription.setStatus(SubscriptionStatus.EXPIRED)
+        );
+
         Instant now = Instant.now();
         Instant periodEnd = now.atZone(ZoneOffset.UTC)
             .plusMonths(1)
@@ -71,6 +86,21 @@ public OrganizationSubscription activateFreePlan(
         .orElseThrow(() ->
             new IllegalStateException("FREE plan is not configured")
         );
+
+    var existing = subscriptionRepository
+        .findFirstByOrganization_IdAndStatusOrderByCreatedAtDesc(
+            organization.getId(),
+            SubscriptionStatus.ACTIVE
+        );
+
+    if (existing.isPresent() &&
+        "FREE".equals(existing.get().getPlan().getCode())) {
+        return existing.get();
+    }
+
+    existing.ifPresent(subscription ->
+        subscription.setStatus(SubscriptionStatus.EXPIRED)
+    );
 
     Instant now = Instant.now();
     Instant end = now.atZone(ZoneOffset.UTC)

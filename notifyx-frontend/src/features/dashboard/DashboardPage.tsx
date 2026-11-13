@@ -1,24 +1,29 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Tooltip } from '../../components/Tooltip'
+import { Toast } from '../../components/Toast'
 import { useAuthStore } from '../../stores/authStore'
 import { useDashboardStore } from '../../stores/dashboardStore'
 
-type View = 'overview' | 'projects' | 'settings'
+type View = 'overview' | 'projects' | 'api-keys' | 'notifications' | 'billing' | 'settings'
 
 const navItems: { id: View; label: string; icon: string }[] = [
   { id: 'overview', label: 'Overview', icon: '⌂' },
   { id: 'projects', label: 'Projects', icon: '▦' },
+  { id: 'api-keys', label: 'API keys', icon: '⌁' },
+  { id: 'notifications', label: 'Send notification', icon: '↗' },
+  { id: 'billing', label: 'Billing & plans', icon: '◈' },
   { id: 'settings', label: 'Settings', icon: '⚙' },
 ]
 
 export function DashboardPage() {
   const { user, accessToken, logout } = useAuthStore()
-  const { organizations, selectedOrganizationId, projects, plans, subscription, isLoading, error, load, selectOrganization, createOrganization, createProject, updateProject, archiveProject } = useDashboardStore()
+  const { organizations, selectedOrganizationId, projects, plans, subscription, apiKeys, newlyCreatedApiKey, lastNotification, deliveryTracking, trackingLoading, checkout, subscriptionMessage, isLoading, error, load, selectOrganization, createOrganization, createProject, updateProject, archiveProject, loadApiKeys, createApiKey, revokeApiKey, clearNewApiKey, sendNotification, loadDeliveryTracking, createCheckout, verifyCheckout, clearCheckout } = useDashboardStore()
   const [view, setView] = useState<View>('overview')
   const [showOrganizationMenu, setShowOrganizationMenu] = useState(false)
   const [showCreateOrganization, setShowCreateOrganization] = useState(false)
   const organization = organizations.find((item) => item.id === selectedOrganizationId) ?? organizations[0]
   useEffect(() => { if (accessToken) void load(accessToken) }, [accessToken, load])
+  const dismissError = useCallback(() => useDashboardStore.setState({ error: null }), [])
   const usage = subscription ? Math.round((subscription.notificationsUsed / Math.max(subscription.monthlyQuota, 1)) * 100) : 0
   const initials = useMemo(() => user?.fullName.split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase() ?? 'NX', [user])
 
@@ -39,9 +44,12 @@ export function DashboardPage() {
       <section className="dashboard-main">
         <header className="dashboard-header"><div><p className="breadcrumb">Workspace / <strong>{view}</strong></p><h1>{view === 'overview' ? 'Good morning, ' : ''}{user?.fullName.split(' ')[0] ?? 'there'} <span>✦</span></h1></div><div className="header-actions"><Tooltip label="Notifications are coming soon"><button className="icon-button">♧<i /></button></Tooltip><div className="user-chip"><span>{initials}</span><div><b>{user?.fullName}</b><small>{user?.email}</small></div><span>⌄</span></div></div></header>
         {isLoading && <div className="loading-banner">Syncing your workspace…</div>}
-        {error && <div className="error-banner" role="alert">{error}</div>}
+        {error && <Toast key={error} message={error} onClose={dismissError} />}
         {view === 'overview' && <Overview usage={usage} subscription={subscription} projects={projects.length} plans={plans.length} />}
         {view === 'projects' && organization && <Projects accessToken={accessToken} organizationId={organization.id} projects={projects} isLoading={isLoading} onCreate={createProject} onUpdate={updateProject} onArchive={archiveProject} />}
+        {view === 'api-keys' && organization && <ApiKeys accessToken={accessToken} organizationId={organization.id} projects={projects} apiKeys={apiKeys} newlyCreatedApiKey={newlyCreatedApiKey} isLoading={isLoading} onLoad={loadApiKeys} onCreate={createApiKey} onRevoke={revokeApiKey} onClearNew={clearNewApiKey} />}
+        {view === 'notifications' && organization && <NotificationComposer accessToken={accessToken} projects={projects} apiKeys={apiKeys} newlyCreatedApiKey={newlyCreatedApiKey} lastNotification={lastNotification} deliveryTracking={deliveryTracking} trackingLoading={trackingLoading} isLoading={isLoading} onSend={sendNotification} onTrack={loadDeliveryTracking} />}
+        {view === 'billing' && organization && <Billing accessToken={accessToken} organizationId={organization.id} plans={plans} subscription={subscription} checkout={checkout} subscriptionMessage={subscriptionMessage} isLoading={isLoading} onCheckout={createCheckout} onVerify={verifyCheckout} onClear={clearCheckout} />}
         {view === 'settings' && <Settings organization={organization?.name ?? 'Your workspace'} />}
         {!organization && <EmptyOrganization onCreate={() => setShowCreateOrganization(true)} />}
       </section>
@@ -108,6 +116,171 @@ function ProjectModal({ project, isLoading, onClose, onSave }: { project: { id?:
 
 function Settings({ organization }: { organization: string }) {
   return <div className="dashboard-content"><div className="page-title"><div><p className="eyebrow">Workspace</p><h2>Settings</h2><p>Manage your {organization} configuration.</p></div></div><div className="settings-card"><h3>API and integrations</h3><p>API key management and channel configuration will appear here as you connect your first project.</p><div className="settings-placeholder">⌁ <span>Secure by default with scoped API keys and idempotent delivery.</span></div></div></div>
+}
+
+function Billing({ accessToken, organizationId, plans, subscription, checkout, subscriptionMessage, isLoading, onCheckout, onVerify, onClear }: {
+  accessToken: string | null
+  organizationId: string
+  plans: { id: string; code: string; name: string; description: string; monthlyPriceInPaise: number; currency: string; monthlyQuota: number; rateLimitPerMinute: number; priority: string; allowedChannels: string[] }[]
+  subscription: { planCode: string; planName: string; status: string; monthlyQuota: number; notificationsUsed: number; remainingNotifications: number; currentPeriodEnd: string } | null
+  checkout: { billingOrderId: string; razorpayOrderId: string; razorpayKeyId: string; amountInPaise: number; currency: string; planName: string } | null
+  subscriptionMessage: string | null
+  isLoading: boolean
+  onCheckout: (accessToken: string, organizationId: string, planCode: string) => Promise<void>
+  onVerify: (accessToken: string, organizationId: string, orderId: string, paymentId: string, signature: string) => Promise<void>
+  onClear: () => void
+}) {
+  const [verificationOpen, setVerificationOpen] = useState(false)
+  const [paymentId, setPaymentId] = useState('')
+  const [signature, setSignature] = useState('')
+  useEffect(() => {
+    if (document.querySelector('script[src="https://checkout.razorpay.com/v1/checkout.js"]')) return
+    const script = document.createElement('script')
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js'
+    script.async = true
+    document.body.appendChild(script)
+    return () => { script.remove() }
+  }, [])
+
+  async function startCheckout(planCode: string) {
+    if (!accessToken) return
+    await onCheckout(accessToken, organizationId, planCode)
+  }
+
+  async function verify(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!accessToken || !checkout) return
+    await onVerify(accessToken, organizationId, checkout.razorpayOrderId, paymentId.trim(), signature.trim())
+  }
+
+  return <div className="dashboard-content"><div className="page-title"><div><p className="eyebrow">Workspace billing</p><h2>Plans & billing</h2><p>Choose the notification capacity that fits your next release.</p></div></div>{subscription && <div className="current-subscription"><div><span className="eyebrow">Current plan</span><h3>{subscription.planName}</h3><span className={`status ${subscription.status.toLowerCase()}`}>{subscription.status.toLowerCase()}</span></div><div><b>{subscription.notificationsUsed.toLocaleString()} / {subscription.monthlyQuota.toLocaleString()}</b><small>notifications used</small></div><div><b>{subscription.remainingNotifications.toLocaleString()}</b><small>remaining this period</small></div><div><b>{new Date(subscription.currentPeriodEnd).toLocaleDateString()}</b><small>period ends</small></div></div>}{subscriptionMessage && <div className="success-card billing-message"><span>✓</span><strong>{subscriptionMessage}</strong></div>}<div className="plan-grid">{plans.length ? plans.map((plan) => { const isCurrentPlan = subscription?.planCode === plan.code; return <article className={`plan-card ${isCurrentPlan ? 'current' : ''}`} key={plan.id}><div className="plan-card-top"><span className="eyebrow">{plan.priority} priority</span>{isCurrentPlan && <span className="current-pill">Current plan</span>}</div><h3>{plan.name}</h3><p>{plan.description}</p><strong className="plan-price">{new Intl.NumberFormat('en-IN', { style: 'currency', currency: plan.currency || 'INR', maximumFractionDigits: 0 }).format(plan.monthlyPriceInPaise / 100)}<small>/month</small></strong><div className="plan-details"><span>◉ {plan.monthlyQuota.toLocaleString()} notifications</span><span>↯ {plan.rateLimitPerMinute}/min rate limit</span><span>✓ {plan.allowedChannels.join(', ')}</span></div><button className="button" disabled={isLoading || isCurrentPlan} onClick={() => void startCheckout(plan.code)}>{isCurrentPlan ? 'Current plan' : isLoading ? 'Preparing…' : 'Choose plan'} <span>→</span></button></article> }) : <div className="empty-state"><span>◈</span><h3>No plans available</h3><p>Plans will appear here once billing is configured.</p></div>}</div>{checkout && <div className="modal-backdrop" role="presentation"><section className="modal-card checkout-card" role="dialog" aria-modal="true" aria-labelledby="checkout-title"><button className="modal-close" onClick={onClear} aria-label="Close">×</button><p className="eyebrow">Razorpay checkout</p><h2 id="checkout-title">{checkout.planName} checkout created</h2><p className="modal-description">Complete the one-time payment in Razorpay Checkout. After payment, paste the returned payment ID and signature if the callback did not verify automatically.</p><button className="button checkout-link" onClick={() => { const options = { key: checkout.razorpayKeyId, amount: checkout.amountInPaise, currency: checkout.currency, name: 'NotifyX', description: checkout.planName, order_id: checkout.razorpayOrderId, handler: (response: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => { setPaymentId(response.razorpay_payment_id); setSignature(response.razorpay_signature); void onVerify(accessToken!, organizationId, response.razorpay_order_id, response.razorpay_payment_id, response.razorpay_signature) } }; const Razorpay = (window as Window & { Razorpay?: new (options: unknown) => { open: () => void } }).Razorpay; if (Razorpay) new Razorpay(options).open(); else window.alert('Razorpay Checkout is still loading. Please try again.'); }}>{isLoading ? 'Processing…' : 'Pay securely with Razorpay'} ↗</button><button className="text-button checkout-toggle" onClick={() => setVerificationOpen((open) => !open)}>{verificationOpen ? 'Hide verification form' : 'Verify payment manually'}</button>{verificationOpen && <form onSubmit={verify} className="verification-form"><label>Payment ID<input required value={paymentId} onChange={(event) => setPaymentId(event.target.value)} placeholder="pay_…" /></label><label>Signature<input required value={signature} onChange={(event) => setSignature(event.target.value)} placeholder="Signature from Razorpay" /></label><button className="button" disabled={isLoading}>{isLoading ? 'Verifying…' : 'Verify payment'} <span>→</span></button></form>}</section></div>}</div>
+}
+
+function NotificationComposer({ accessToken, projects, apiKeys, newlyCreatedApiKey, lastNotification, deliveryTracking, trackingLoading, isLoading, onSend, onTrack }: {
+  accessToken: string | null
+  projects: { id: string; name: string }[]
+  apiKeys: { id: string; projectId: string; name: string; keyPrefix: string; status: string }[]
+  newlyCreatedApiKey: { projectId: string; apiKey: string } | null
+  lastNotification: { id: string; projectId: string; channel: string; recipient: string; status: string; scheduledAt: string | null } | null
+  deliveryTracking: { notificationId: string; notificationStatus: string; attempts: { status: string; errorMessage: string | null }[]; events: { type: string; occurredAt: string }[] } | null
+  trackingLoading: boolean
+  isLoading: boolean
+  onSend: (apiKey: string, projectId: string, request: { channel: string; recipient: string; subject?: string; content: string; metadata?: Record<string, string>; scheduledAt?: string }) => Promise<{ id: string; projectId: string; channel: string; recipient: string; status: string; scheduledAt: string | null }>
+  onTrack: (accessToken: string, projectId: string, notificationId: string) => Promise<unknown>
+}) {
+  const [projectId, setProjectId] = useState(projects[0]?.id ?? '')
+  const [apiKey, setApiKey] = useState(newlyCreatedApiKey?.projectId === projectId ? newlyCreatedApiKey.apiKey : '')
+  const [channel, setChannel] = useState('EMAIL')
+  const [recipient, setRecipient] = useState('')
+  const [subject, setSubject] = useState('')
+  const [content, setContent] = useState('')
+  const [metadata, setMetadata] = useState('')
+  const [scheduledAt, setScheduledAt] = useState('')
+  const [formError, setFormError] = useState('')
+  const [isSending, setIsSending] = useState(false)
+  const projectKeys = apiKeys.filter((key) => key.projectId === projectId && key.status === 'ACTIVE')
+  const [trackingError, setTrackingError] = useState('')
+
+  useEffect(() => {
+    if (!accessToken || !lastNotification) return
+    let cancelled = false
+    let pollCount = 0
+    const poll = async () => {
+      try {
+        await onTrack(accessToken, lastNotification.projectId, lastNotification.id)
+        const status = useDashboardStore.getState().deliveryTracking?.notificationStatus
+        if (cancelled || pollCount >= 40 || status === 'SENT' || status === 'FAILED' || status === 'CANCELLED') return
+        pollCount += 1
+        window.setTimeout(() => { void poll() }, 3000)
+      } catch (error) {
+        if (!cancelled) setTrackingError(error instanceof Error ? error.message : 'Unable to refresh delivery status.')
+      }
+    }
+    void poll()
+    return () => { cancelled = true }
+  }, [accessToken, lastNotification, onTrack])
+
+  function chooseProject(value: string) {
+    setProjectId(value)
+    setApiKey(newlyCreatedApiKey?.projectId === value ? newlyCreatedApiKey.apiKey : '')
+  }
+
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (isSending) return
+    setFormError('')
+    let parsedMetadata: Record<string, string> | undefined
+    if (metadata.trim()) {
+      try {
+        const parsed = JSON.parse(metadata) as unknown
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error()
+        parsedMetadata = Object.fromEntries(Object.entries(parsed).map(([key, value]) => [key, String(value)]))
+      } catch {
+        setFormError('Metadata must be a valid JSON object, for example {"source":"dashboard"}.')
+        return
+      }
+    }
+    if (!apiKey.trim()) {
+      setFormError('Enter the full API key secret. You can copy it when creating a key.')
+      return
+    }
+    if (!projectId) {
+      setFormError('Select a project before sending.')
+      return
+    }
+    if (scheduledAt && new Date(scheduledAt).getTime() <= Date.now()) {
+      setFormError('Scheduled time must be in the future.')
+      return
+    }
+    setIsSending(true)
+    try {
+      await onSend(apiKey.trim(), projectId, { channel, recipient: recipient.trim(), ...(subject.trim() ? { subject: subject.trim() } : {}), content: content.trim(), ...(parsedMetadata ? { metadata: parsedMetadata } : {}), ...(scheduledAt ? { scheduledAt: new Date(scheduledAt).toISOString() } : {}) })
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : 'Unable to submit the notification.')
+    } finally {
+      setIsSending(false)
+    }
+  }
+
+  const status = deliveryTracking?.notificationStatus ?? lastNotification?.status ?? 'ACCEPTED'
+  const statusLabel = status === 'SENT' ? 'Sent by provider' : status === 'FAILED' ? 'Delivery failed' : status === 'PROCESSING' ? 'Processing' : status === 'QUEUED' ? 'Queued for delivery' : 'Accepted'
+  return <div className="dashboard-content"><div className="page-title"><div><p className="eyebrow">Delivery playground</p><h2>Send a notification</h2><p>Send a real test message through your project API key.</p></div><Tooltip label="Every submission receives a unique Idempotency-Key automatically"><span className="idempotency-badge">↯ Idempotent delivery</span></Tooltip></div>{projects.length === 0 ? <div className="empty-state"><span>↗</span><h3>Create a project first</h3><p>Notifications are sent through a project-scoped API key.</p></div> : <form className="composer-layout" onSubmit={submit}><section className="composer-card"><div className="composer-section"><label>Project<select value={projectId} onChange={(event) => chooseProject(event.target.value)}>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label><label>Channel<select value={channel} onChange={(event) => setChannel(event.target.value)}><option value="EMAIL">Email</option><option value="SMS">SMS</option><option value="PUSH">Push</option><option value="IN_APP">In-app</option></select></label></div><label>API key secret  <Tooltip label="This is sent as the X-NotifyX-API-Key header and is never stored"><span className="field-info">ⓘ</span></Tooltip><input required type="password" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder="nx_live_••••••••" /><small className="field-hint">Use the full secret shown once after creating an API key.</small></label><label>Recipient<input required maxLength={320} value={recipient} onChange={(event) => setRecipient(event.target.value)} placeholder={channel === 'EMAIL' ? 'customer@example.com' : '+1 555 0100'} /></label>{channel === 'EMAIL' && <label>Subject<input maxLength={255} value={subject} onChange={(event) => setSubject(event.target.value)} placeholder="Your order is on its way" /></label>}<label>Message content<textarea required maxLength={10000} rows={7} value={content} onChange={(event) => setContent(event.target.value)} placeholder="Write the message you want to send…" /></label><div className="composer-section"><label>Schedule (optional)<input type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} /></label><label>Metadata (optional)<input value={metadata} onChange={(event) => setMetadata(event.target.value)} placeholder='{"source":"dashboard"}' /></label></div>{formError && <div className="form-error" role="alert">{formError}</div>}<div className="composer-actions"><span>Requires an active project API key</span><button className="button" disabled={isSending || isLoading}>{isSending ? 'Sending…' : 'Send notification'} <span>→</span></button></div></section><aside className="composer-side"><div className="panel"><p className="eyebrow">Active keys</p><h3>{projectKeys.length} available</h3>{projectKeys.length ? projectKeys.map((key) => <div className="composer-key" key={key.id}><span>⌁</span><div><b>{key.name}</b><small>{key.keyPrefix}••••••</small></div></div>) : <p className="side-muted">Create an active API key before sending.</p>}</div>{lastNotification && <div className="success-card"><span>✓</span><strong>{statusLabel}</strong><small>{lastNotification.channel} to {lastNotification.recipient}</small><code>{trackingLoading ? 'Refreshing delivery status…' : status}{trackingError ? ` · ${trackingError}` : ''}{deliveryTracking?.events.length ? ` · ${deliveryTracking.events.length} provider event(s)` : ''}</code>{deliveryTracking?.attempts.at(-1)?.errorMessage && <small>{deliveryTracking.attempts.at(-1)?.errorMessage}</small>}</div>}</aside></form>}</div>
+}
+
+function ApiKeys({ accessToken, organizationId, projects, apiKeys, newlyCreatedApiKey, isLoading, onLoad, onCreate, onRevoke, onClearNew }: {
+  accessToken: string | null
+  organizationId: string
+  projects: { id: string; name: string; slug: string }[]
+  apiKeys: { id: string; projectId: string; name: string; keyPrefix: string; status: string; expiresAt: string | null; lastUsedAt: string | null; createdAt: string; revokedAt: string | null }[]
+  newlyCreatedApiKey: { id: string; projectId: string; name: string; keyPrefix: string; apiKey: string; status: string; expiresAt: string | null; createdAt: string } | null
+  isLoading: boolean
+  onLoad: (accessToken: string, organizationId: string, projectId: string) => Promise<void>
+  onCreate: (accessToken: string, organizationId: string, projectId: string, name: string, expiresInDays: number | null) => Promise<void>
+  onRevoke: (accessToken: string, organizationId: string, projectId: string, apiKeyId: string) => Promise<void>
+  onClearNew: () => void
+}) {
+  const [projectId, setProjectId] = useState(projects[0]?.id ?? '')
+  const [showCreate, setShowCreate] = useState(false)
+  useEffect(() => { if (accessToken && projectId) void onLoad(accessToken, organizationId, projectId) }, [accessToken, organizationId, projectId, onLoad])
+  const projectKeys = apiKeys.filter((key) => key.projectId === projectId)
+
+  async function create(name: string, expiresInDays: number | null) {
+    if (!accessToken) return
+    await onCreate(accessToken, organizationId, projectId, name, expiresInDays)
+    setShowCreate(false)
+  }
+
+  function copyKey(value: string) {
+    void navigator.clipboard.writeText(value)
+  }
+
+  return <div className="dashboard-content"><div className="page-title"><div><p className="eyebrow">Project security</p><h2>API keys</h2><p>Authenticate notification ingestion without exposing your user session.</p></div>{projects.length > 0 && <button className="button" onClick={() => setShowCreate(true)}>+ Create API key</button>}</div>{projects.length === 0 ? <div className="empty-state"><span>⌁</span><h3>Create a project first</h3><p>API keys belong to a specific project.</p></div> : <><div className="key-toolbar"><label>Project<select value={projectId} onChange={(event) => setProjectId(event.target.value)}>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label><span className="key-count">{projectKeys.length} {projectKeys.length === 1 ? 'key' : 'keys'}</span></div>{newlyCreatedApiKey && newlyCreatedApiKey.projectId === projectId && <div className="secret-banner"><div><strong>Copy this API key now</strong><p>For security, NotifyX will not show the full secret again.</p><code>{newlyCreatedApiKey.apiKey}</code></div><div className="secret-actions"><button className="button" onClick={() => copyKey(newlyCreatedApiKey.apiKey)}>Copy key</button><button className="text-button" onClick={onClearNew}>Dismiss</button></div></div>}<div className="key-list">{projectKeys.length ? projectKeys.map((key) => <article className="key-row" key={key.id}><span className="key-icon">⌁</span><div><b>{key.name}</b><small><code>{key.keyPrefix}••••••••</code> · created {new Date(key.createdAt).toLocaleDateString()}</small></div><span className={`status ${key.status.toLowerCase()}`}>{key.status.toLowerCase()}</span><Tooltip label={key.lastUsedAt ? `Last used ${new Date(key.lastUsedAt).toLocaleString()}` : 'This key has not been used yet'}><span className="key-last-used">{key.lastUsedAt ? 'Used' : 'Unused'} ⓘ</span></Tooltip><button className="revoke-button" disabled={key.status === 'REVOKED' || isLoading} onClick={() => { if (window.confirm(`Revoke ${key.name}? This cannot be undone.`) && accessToken) void onRevoke(accessToken, organizationId, projectId, key.id) }}>Revoke</button></article>) : <div className="empty-state"><span>⌁</span><h3>No API keys yet</h3><p>Create a scoped key to authenticate your notification requests.</p><button className="button" onClick={() => setShowCreate(true)}>Create API key</button></div>}</div></>}{showCreate && <CreateApiKeyModal isLoading={isLoading} onClose={() => setShowCreate(false)} onCreate={create} />}</div>
+}
+
+function CreateApiKeyModal({ isLoading, onClose, onCreate }: { isLoading: boolean; onClose: () => void; onCreate: (name: string, expiresInDays: number | null) => Promise<void> }) {
+  const [name, setName] = useState('')
+  const [expiresInDays, setExpiresInDays] = useState('90')
+  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) onClose() }}><section className="modal-card" role="dialog" aria-modal="true" aria-labelledby="create-key-title"><button className="modal-close" onClick={onClose} aria-label="Close">×</button><p className="eyebrow">Project security</p><h2 id="create-key-title">Create an API key</h2><p className="modal-description">Use separate keys for each environment and revoke them independently.</p><form onSubmit={(event) => { event.preventDefault(); void onCreate(name.trim(), expiresInDays ? Number(expiresInDays) : null) }}><label>Key name<input required maxLength={100} value={name} onChange={(event) => setName(event.target.value)} placeholder="Production server" /></label><label>Expires in days<input type="number" min="1" max="3650" value={expiresInDays} onChange={(event) => setExpiresInDays(event.target.value)} /><small className="field-hint">Leave blank for a non-expiring key.</small></label><div className="modal-actions"><button type="button" className="text-button" onClick={onClose}>Cancel</button><button className="button" disabled={isLoading}>{isLoading ? 'Creating…' : 'Create key'} <span>→</span></button></div></form></section></div>
 }
 
 function EmptyOrganization({ onCreate }: { onCreate: () => void }) {

@@ -1,10 +1,7 @@
 import { create } from 'zustand'
 import { apiRequest } from '../lib/api'
+import { clearStoredAuth, getStoredAccessToken, getStoredRefreshToken, getStoredUser, saveAuthResponse } from '../lib/authStorage'
 import type { AuthResponse, User } from '../lib/types'
-
-const ACCESS_TOKEN_KEY = 'notifyx.accessToken'
-const REFRESH_TOKEN_KEY = 'notifyx.refreshToken'
-const USER_KEY = 'notifyx.user'
 
 type AuthState = {
   user: User | null
@@ -18,19 +15,15 @@ type AuthState = {
   clearError: () => void
 }
 
-const storedUser = localStorage.getItem(USER_KEY)
-
 function saveAuth(auth: AuthResponse) {
-  localStorage.setItem(ACCESS_TOKEN_KEY, auth.accessToken)
-  localStorage.setItem(REFRESH_TOKEN_KEY, auth.refreshToken)
-  localStorage.setItem(USER_KEY, JSON.stringify(auth.user))
+  saveAuthResponse(auth)
   return { user: auth.user, accessToken: auth.accessToken, refreshToken: auth.refreshToken }
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
-  user: storedUser ? (JSON.parse(storedUser) as User) : null,
-  accessToken: localStorage.getItem(ACCESS_TOKEN_KEY),
-  refreshToken: localStorage.getItem(REFRESH_TOKEN_KEY),
+  user: getStoredUser(),
+  accessToken: getStoredAccessToken(),
+  refreshToken: getStoredRefreshToken(),
   isLoading: false,
   error: null,
   login: async (email, password) => {
@@ -59,11 +52,18 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       if (refreshToken) await apiRequest('/api/v1/auth/logout', { method: 'POST', body: JSON.stringify({ refreshToken }) })
     } finally {
-      localStorage.removeItem(ACCESS_TOKEN_KEY)
-      localStorage.removeItem(REFRESH_TOKEN_KEY)
-      localStorage.removeItem(USER_KEY)
+      clearStoredAuth()
       set({ user: null, accessToken: null, refreshToken: null, error: null })
     }
   },
   clearError: () => set({ error: null }),
 }))
+
+window.addEventListener('notifyx:auth-refreshed', (event) => {
+  const auth = (event as CustomEvent<AuthResponse>).detail
+  useAuthStore.setState({ ...saveAuth(auth), error: null })
+})
+window.addEventListener('notifyx:auth-expired', () => {
+  clearStoredAuth()
+  useAuthStore.setState({ user: null, accessToken: null, refreshToken: null, error: 'Your session has expired. Please sign in again.' })
+})

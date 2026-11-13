@@ -1,4 +1,18 @@
-# React + TypeScript + Vite
+# NotifyX frontend
+
+The frontend uses the tunneled backend by default:
+
+```text
+https://webhook.200630.xyz
+```
+
+To use another backend during local development, create `.env.local`:
+
+```env
+VITE_API_BASE_URL=http://localhost:4040
+```
+
+Restart Vite after changing environment variables.
 
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
 

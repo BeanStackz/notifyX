@@ -66,6 +66,22 @@ public class OutboxEvent {
     @Column(name = "published_at")
     private Instant publishedAt;
 
+    @Column(name = "next_attempt_at")
+    private Instant nextAttemptAt;
+
+    @Column(name = "locked_at")
+    private Instant lockedAt;
+
+    @Column(name = "locked_by", length = 100)
+    private String lockedBy;
+
+    @Column(name = "last_error", columnDefinition = "TEXT")
+    private String lastError;
+
+    @Column(name = "event_version", nullable = false)
+    @Builder.Default
+    private int eventVersion = 1;
+
     @PrePersist
     protected void onCreate() {
         createdAt = Instant.now();

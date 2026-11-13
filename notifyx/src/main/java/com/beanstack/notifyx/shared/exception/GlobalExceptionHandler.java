@@ -4,6 +4,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.slf4j.Logger;
@@ -12,8 +13,10 @@ import org.slf4j.LoggerFactory;
 import com.beanstack.notifyx.shared.response.ApiResponse;
 import com.beanstack.notifyx.subscription.exception.ActiveSubscriptionAlreadyExistsException;
 import com.beanstack.notifyx.subscription.exception.NoActiveSubscriptionException;
+import com.beanstack.notifyx.subscription.exception.RazorpayCheckoutCreationException;
 import com.beanstack.notifyx.subscription.exception.SubscriptionQuotaExceededException;
 import com.beanstack.notifyx.subscription.exception.UnsupportedNotificationChannelException;
+import com.beanstack.notifyx.payment.exception.RazorpayPlanNotConfiguredException;
 
 @RestControllerAdvice 
 public class GlobalExceptionHandler {
@@ -44,6 +47,16 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .badRequest()
                 .body(ApiResponse.error(message));
+    }
+
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMissingHeader(
+            MissingRequestHeaderException exception
+    ) {
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.error(
+                        exception.getHeaderName() + " header is required"
+                ));
     }
 
     @ExceptionHandler (EmailAlreadyExistsException.class)
@@ -154,6 +167,29 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error(exception.getMessage()));
         }
+
+    @ExceptionHandler(RazorpayCheckoutCreationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleRazorpayCheckoutFailure(
+        RazorpayCheckoutCreationException exception
+    ) {
+        LOGGER.error("Razorpay checkout creation failed", exception);
+
+        return ResponseEntity
+            .status(HttpStatus.BAD_GATEWAY)
+            .body(ApiResponse.error(
+                "Unable to create the payment checkout. Verify the Razorpay "
+                    + "plan configuration and try again."
+            ));
+    }
+
+    @ExceptionHandler(RazorpayPlanNotConfiguredException.class)
+    public ResponseEntity<ApiResponse<Void>> handleRazorpayPlanNotConfigured(
+        RazorpayPlanNotConfiguredException exception
+    ) {
+        return ResponseEntity
+            .status(HttpStatus.SERVICE_UNAVAILABLE)
+            .body(ApiResponse.error(exception.getMessage()));
+    }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleGeneral(

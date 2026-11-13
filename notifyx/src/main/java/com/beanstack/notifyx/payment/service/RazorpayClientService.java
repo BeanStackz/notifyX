@@ -1,6 +1,7 @@
 package com.beanstack.notifyx.payment.service;
 
 import java.util.Map;
+import java.util.UUID;
 
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -64,7 +65,7 @@ public class RazorpayClientService {
             .retrieve()
             .body(JsonNode.class);
 
-        String planId = response == null ? null : response.path("id").asText();
+        String planId = response == null ? null : response.path("id").asString();
 
         if (planId == null || planId.isBlank()) {
             throw new IllegalStateException(
@@ -101,17 +102,67 @@ public class RazorpayClientService {
             .retrieve()
             .body(JsonNode.class);
 
-        if (response == null || response.path("id").asText().isBlank()) {
+        if (response == null || response.path("id").asString().isBlank()) {
             throw new IllegalStateException(
                 "Razorpay did not return a subscription ID"
             );
         }
 
         return new RazorpaySubscriptionResult(
-            response.path("id").asText(),
-            response.path("short_url").asText(null),
-            response.path("status").asText()
+            response.path("id").asString(),
+            response.path("short_url").asString(null),
+            response.path("status").asString()
         );
+    }
+
+    public String createOrder(
+        long amountInPaise,
+        String currency,
+        UUID localOrderId,
+        UUID organizationId
+    ) {
+        Map<String, Object> body = Map.of(
+            "amount", amountInPaise,
+            "currency", currency,
+            "receipt", localOrderId.toString(),
+            "notes", Map.of(
+                "notifyx_order_id", localOrderId.toString(),
+                "notifyx_organization_id", organizationId.toString()
+            )
+        );
+
+        JsonNode response = client().post()
+            .uri("/v1/orders")
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(body)
+            .retrieve()
+            .body(JsonNode.class);
+
+        String orderId = response == null ? "" : response.path("id").asString();
+        if (orderId.isBlank()) {
+            throw new IllegalStateException("Razorpay did not return an order ID");
+        }
+        return orderId;
+    }
+
+    public JsonNode cancelSubscription(
+        String razorpaySubscriptionId,
+        boolean cancelAtCycleEnd
+    ) {
+        Map<String, Object> body = Map.of(
+            "cancel_at_cycle_end",
+            cancelAtCycleEnd
+        );
+
+        return client().post()
+            .uri(
+                "/v1/subscriptions/{id}/cancel",
+                razorpaySubscriptionId
+            )
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(body)
+            .retrieve()
+            .body(JsonNode.class);
     }
 
     public String getKeyId() {

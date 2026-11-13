@@ -12,6 +12,7 @@ import java.util.UUID;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,10 +25,16 @@ import com.beanstack.notifyx.organization.entity.OrganizationRole;
 import com.beanstack.notifyx.organization.repository.OrganizationMemberRepository;
 import com.beanstack.notifyx.organization.repository.OrganizationRepository;
 import com.beanstack.notifyx.payment.config.RazorpayProperties;
+import com.beanstack.notifyx.payment.entity.BillingOrder;
+import com.beanstack.notifyx.payment.entity.BillingOrderStatus;
+import com.beanstack.notifyx.payment.repository.BillingOrderRepository;
 import com.beanstack.notifyx.payment.dto.RazorpaySubscriptionResult;
+import com.beanstack.notifyx.payment.exception.RazorpayPlanNotConfiguredException;
 import com.beanstack.notifyx.payment.service.RazorpayClientService;
 import com.beanstack.notifyx.shared.exception.ResourceNotFoundException;
 import com.beanstack.notifyx.subscription.dto.request.VerifySubscriptionPaymentRequest;
+import com.beanstack.notifyx.subscription.dto.request.VerifyPaymentRequest;
+import com.beanstack.notifyx.subscription.dto.response.BillingCheckoutResponse;
 import com.beanstack.notifyx.subscription.dto.response.PlanResponse;
 import com.beanstack.notifyx.subscription.dto.response.SubscriptionCheckoutResponse;
 import com.beanstack.notifyx.subscription.dto.response.SubscriptionResponse;
@@ -62,9 +69,118 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     private final SubscriptionUsageRepository usageRepository;
 
     private final RazorpayClientService razorpayClientService;
+    private final BillingOrderRepository billingOrderRepository;
     private final RazorpayProperties razorpayProperties;
 
     private final EntityManager entityManager;
+
+    @Value("${notifyx.billing.subscription-total-count:120}")
+    private int subscriptionTotalCount;
+
+    @Override
+    @Transactional(noRollbackFor = RazorpayCheckoutCreationException.class)
+    public BillingCheckoutResponse createBillingOrder(
+        UUID organizationId, String userEmail, String planCode
+    ) {
+        Organization organization = findOrganization(organizationId);
+        requireBillingPermission(organizationId, userEmail);
+        Plan plan = planRepository.findByCodeAndEnabledTrue(
+            planCode.trim().toUpperCase()
+        ).orElseThrow(() -> new ResourceNotFoundException("Plan not found"));
+
+        if ("FREE".equals(plan.getCode())) {
+            throw new IllegalArgumentException("FREE plan is assigned automatically");
+        }
+
+        BillingOrder order = billingOrderRepository.saveAndFlush(
+            BillingOrder.builder()
+                .organization(organization)
+                .plan(plan)
+                .amountInPaise(plan.getMonthlyPriceInPaise())
+                .currency(plan.getCurrency())
+                .status(BillingOrderStatus.CREATED)
+                .build()
+        );
+
+        try {
+            order.setRazorpayOrderId(razorpayClientService.createOrder(
+                order.getAmountInPaise(), order.getCurrency(),
+                order.getId(), organizationId
+            ));
+            order.setStatus(BillingOrderStatus.PAYMENT_PENDING);
+            return new BillingCheckoutResponse(
+                order.getId(), order.getRazorpayOrderId(),
+                razorpayClientService.getKeyId(), order.getAmountInPaise(),
+                order.getCurrency(), plan.getName()
+            );
+        } catch (Exception exception) {
+            order.setStatus(BillingOrderStatus.FAILED);
+            throw new RazorpayCheckoutCreationException(
+                "Unable to create Razorpay order", exception
+            );
+        }
+    }
+
+    @Override
+    @Transactional
+    public void verifyPayment(
+        UUID organizationId, String userEmail, VerifyPaymentRequest request
+    ) {
+        requireBillingPermission(organizationId, userEmail);
+        BillingOrder order = billingOrderRepository
+            .findByRazorpayOrderId(request.razorpayOrderId())
+            .filter(value -> value.getOrganization().getId().equals(organizationId))
+            .orElseThrow(() -> new ResourceNotFoundException("Billing order not found"));
+
+        String expected = generateHmac(
+            request.razorpayOrderId() + "|" + request.razorpayPaymentId(),
+            razorpayProperties.keySecret()
+        );
+        if (!MessageDigest.isEqual(
+            HexFormat.of().parseHex(expected),
+            HexFormat.of().parseHex(request.razorpaySignature())
+        )) {
+            throw new IllegalArgumentException("Invalid Razorpay payment signature");
+        }
+        activatePaidOrder(order, request.razorpayPaymentId());
+    }
+
+    private void activatePaidOrder(BillingOrder order, String paymentId) {
+        if (order.getStatus() == BillingOrderStatus.PAID) return;
+        if (billingOrderRepository.existsByRazorpayPaymentId(paymentId)) {
+            throw new IllegalArgumentException("Payment is already associated with an order");
+        }
+        subscriptionRepository.findFirstByOrganization_IdAndStatusOrderByCreatedAtDesc(
+            order.getOrganization().getId(), SubscriptionStatus.ACTIVE
+        ).ifPresent(active -> active.setStatus(SubscriptionStatus.EXPIRED));
+
+        Instant start = Instant.now();
+        Instant end = start.atZone(ZoneOffset.UTC).plusMonths(1).toInstant();
+        OrganizationSubscription entitlement = subscriptionRepository.save(
+            OrganizationSubscription.builder()
+                .organization(order.getOrganization())
+                .plan(order.getPlan())
+                .status(SubscriptionStatus.ACTIVE)
+                .currentPeriodStart(start)
+                .currentPeriodEnd(end)
+                .cancelAtPeriodEnd(false)
+                .build()
+        );
+        usageRepository.save(SubscriptionUsage.builder()
+            .subscription(entitlement).periodStart(start).periodEnd(end)
+            .notificationsUsed(0).build());
+        order.setRazorpayPaymentId(paymentId);
+        order.setPaidAt(start);
+        order.setStatus(BillingOrderStatus.PAID);
+    }
+
+    @Override
+    @Transactional
+    public void confirmOrderPayment(UUID billingOrderId, String paymentId) {
+        BillingOrder order = billingOrderRepository.findByIdForUpdate(billingOrderId)
+            .orElseThrow(() -> new ResourceNotFoundException("Billing order not found"));
+        activatePaidOrder(order, paymentId);
+    }
 
     @Override
     @Transactional(readOnly = true)
@@ -113,8 +229,8 @@ public class SubscriptionServiceImpl implements SubscriptionService {
 
         if (plan.getRazorpayPlanId() == null ||
             plan.getRazorpayPlanId().isBlank()) {
-            throw new IllegalStateException(
-                "Razorpay plan has not been provisioned"
+            throw new RazorpayPlanNotConfiguredException(
+                "The selected plan is not configured for Razorpay"
             );
         }
 
@@ -147,7 +263,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                     plan.getRazorpayPlanId(),
                     saved.getId().toString(),
                     organizationId.toString(),
-                    120
+                    subscriptionTotalCount
                 );
 
             saved.setRazorpaySubscriptionId(
@@ -238,6 +354,38 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         );
 
         subscription.setStatus(SubscriptionStatus.AUTHENTICATED);
+    }
+
+    @Override
+    @Transactional
+    public void cancelSubscription(
+        UUID organizationId,
+        String userEmail
+    ) {
+        requireBillingPermission(organizationId, userEmail);
+
+        OrganizationSubscription subscription =
+            findEntitledSubscriptionForUpdate(organizationId);
+
+        if ("FREE".equals(subscription.getPlan().getCode())) {
+            throw new IllegalArgumentException(
+                "The FREE plan cannot be cancelled"
+            );
+        }
+
+        if (subscription.getRazorpaySubscriptionId() == null ||
+            subscription.getRazorpaySubscriptionId().isBlank()) {
+            throw new IllegalStateException(
+                "Razorpay subscription ID is missing"
+            );
+        }
+
+        razorpayClientService.cancelSubscription(
+            subscription.getRazorpaySubscriptionId(),
+            true
+        );
+
+        subscription.setCancelAtPeriodEnd(true);
     }
 
     @Override
@@ -384,11 +532,27 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         OrganizationSubscription subscription =
             findEntitledSubscription(organizationId);
 
-        return subscriptionRepository
+        OrganizationSubscription locked = subscriptionRepository
             .findByIdForUpdate(subscription.getId())
             .orElseThrow(() ->
                 new IllegalStateException("Subscription not found")
             );
+
+        if (locked.getStatus() != SubscriptionStatus.ACTIVE &&
+            locked.getStatus() != SubscriptionStatus.PAST_DUE) {
+            throw new IllegalStateException(
+                "Subscription is no longer entitled"
+            );
+        }
+
+        if (locked.getCurrentPeriodEnd() == null ||
+            !locked.getCurrentPeriodEnd().isAfter(Instant.now())) {
+            throw new IllegalStateException(
+                "Subscription billing period has expired"
+            );
+        }
+
+        return locked;
     }
 
     private Organization findOrganization(UUID organizationId) {

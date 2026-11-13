@@ -95,7 +95,7 @@ public class SecurityConfig {
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         
         // Must allow Authorization and any custom API Key headers your frontend sends
-        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-API-KEY"));
+        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-NotifyX-API-Key", "Idempotency-Key"));
         
         // Required if your frontend sends cookies (like refresh tokens) or Authorization headers
         configuration.setAllowCredentials(true);

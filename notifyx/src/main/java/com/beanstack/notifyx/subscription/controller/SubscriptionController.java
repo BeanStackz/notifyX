@@ -68,6 +68,7 @@ public class SubscriptionController {
             );
     }
 
+
     @PostMapping("/{subscriptionId}/verify")
     public ResponseEntity<ApiResponse<Void>> verifyCheckout(
         @PathVariable UUID organizationId,
@@ -85,6 +86,24 @@ public class SubscriptionController {
         return ResponseEntity.ok(
             ApiResponse.success(
                 "Checkout signature verified. Waiting for subscription activation.",
+                null
+            )
+        );
+    }
+
+    @PostMapping("/cancel")
+    public ResponseEntity<ApiResponse<Void>> cancelSubscription(
+        @PathVariable UUID organizationId,
+        @AuthenticationPrincipal UserDetails userDetails
+    ) {
+        subscriptionService.cancelSubscription(
+            organizationId,
+            userDetails.getUsername()
+        );
+
+        return ResponseEntity.ok(
+            ApiResponse.success(
+                "Subscription cancellation scheduled",
                 null
             )
         );
