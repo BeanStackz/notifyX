@@ -12,6 +12,7 @@ import com.beanstack.notifyx.delivery.entity.DeliveryStatus;
 import com.beanstack.notifyx.delivery.provider.NotificationProvider;
 import com.beanstack.notifyx.delivery.repository.DeliveryAttemptRepository;
 import com.beanstack.notifyx.notification.entity.Notification;
+import com.beanstack.notifyx.notification.entity.NotificationChannel;
 import com.beanstack.notifyx.notification.entity.NotificationStatus;
 import com.beanstack.notifyx.notification.repository.NotificationRepository;
 
@@ -54,12 +55,35 @@ public class NotificationDeliveryService {
             .build());
     }
 
-    public NotificationProvider providerFor(Notification notification) {
+    public DeliveryContext createContext(DeliveryAttempt attempt) {
+        Notification notification = attempt.getNotification();
+        if (notification == null) {
+            throw new IllegalStateException(
+                "Delivery attempt does not contain a notification"
+            );
+        }
+        return new DeliveryContext(
+            notification.getId(),
+            notification.getProject().getId(),
+            attempt.getId(),
+            attempt.getEventId(),
+            notification.getChannel(),
+            notification.getPriority(),
+            notification.getRecipient(),
+            notification.getSubject(),
+            notification.getContent(),
+            notification.getMetadata(),
+            notification.getProject().getName(),
+            notification.getProject().getOrganization().getName()
+        );
+    }
+
+    public NotificationProvider providerFor(NotificationChannel channel) {
         return providers.stream()
-            .filter(provider -> provider.getChannel() == notification.getChannel())
+            .filter(provider -> provider.getChannel() == channel)
             .findFirst()
             .orElseThrow(() -> new IllegalStateException(
-                "No provider configured for " + notification.getChannel()
+                "No provider configured for " + channel
             ));
     }
 
@@ -86,3 +110,4 @@ public class NotificationDeliveryService {
         idempotencyService.fail(attempt.getEventId(), exception);
     }
 }
+

@@ -18,7 +18,6 @@ import com.beanstack.notifyx.outbox.config.RabbitTopologyConfig;
 import com.beanstack.notifyx.outbox.entity.OutboxEvent;
 
 import lombok.RequiredArgsConstructor;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 @Service

@@ -1,12 +1,11 @@
 package com.beanstack.notifyx.messaging.consumer;
 
-import java.util.UUID;
-
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 
 import com.beanstack.notifyx.delivery.entity.DeliveryAttempt;
+import com.beanstack.notifyx.delivery.service.DeliveryRetryService;
 import com.beanstack.notifyx.delivery.service.NotificationDeliveryService;
 import com.beanstack.notifyx.outbox.config.RabbitTopologyConfig;
 import com.beanstack.notifyx.outbox.dto.NotificationAcceptedEvent;
@@ -20,6 +19,7 @@ import tools.jackson.databind.ObjectMapper;
 public class NotificationEventConsumer {
     private final ObjectMapper objectMapper;
     private final NotificationDeliveryService deliveryService;
+    private final DeliveryRetryService deliveryRetryService;
 
     @RabbitListener(
         queues = RabbitTopologyConfig.QUEUE,
@@ -46,9 +46,9 @@ public class NotificationEventConsumer {
         }
 
         try {
-            var notification = attempt.getNotification();
-            var provider = deliveryService.providerFor(notification);
-            var result = provider.send(notification);
+            var context = deliveryService.createContext(attempt);
+            var provider = deliveryService.providerFor(context.channel());
+            var result = provider.send(context);
             deliveryService.complete(
                 attempt,
                 result.providerMessageId(),
@@ -56,8 +56,8 @@ public class NotificationEventConsumer {
             );
             channel.basicAck(tag, false);
         } catch (Exception exception) {
-            deliveryService.fail(attempt, exception);
-            channel.basicNack(tag, false, false);
+            deliveryRetryService.handleFailure(attempt.getId(), exception);
+            channel.basicAck(tag, false);
         }
     }
 }

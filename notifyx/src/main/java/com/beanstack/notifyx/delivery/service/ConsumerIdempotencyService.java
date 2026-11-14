@@ -83,6 +83,7 @@ public class ConsumerIdempotencyService {
     public void fail(String eventId, Exception exception) {
         ConsumerEvent event = find(eventId);
         event.setStatus(ConsumerEventStatus.FAILED);
+        event.setCompletedAt(Instant.now());
         event.setLastError(errorMessage(exception));
     }
 

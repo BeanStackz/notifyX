@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
 import com.beanstack.notifyx.delivery.config.BrevoProperties;
-import com.beanstack.notifyx.notification.entity.Notification;
+import com.beanstack.notifyx.delivery.service.DeliveryContext;
 import com.beanstack.notifyx.notification.entity.NotificationChannel;
 
 import lombok.RequiredArgsConstructor;
@@ -31,7 +31,7 @@ public class EmailProvider implements NotificationProvider {
     }
 
     @Override
-    public DeliveryResult send(Notification notification) {
+    public DeliveryResult send(DeliveryContext context) {
         validateConfiguration();
 
         Map<String, Object> body = Map.of(
@@ -40,11 +40,11 @@ public class EmailProvider implements NotificationProvider {
                 "name", properties.senderName()
             ),
             "to", new Map[] {
-                Map.of("email", notification.getRecipient())
+                Map.of("email", context.recipient())
             },
-            "subject", subject(notification),
-            "htmlContent", templateRenderer.render(notification),
-            "textContent", notification.getContent()
+            "subject", subject(context),
+            "htmlContent", templateRenderer.render(context),
+            "textContent", context.content()
         );
 
         JsonNode response = RestClient.builder()
@@ -78,11 +78,11 @@ public class EmailProvider implements NotificationProvider {
         }
     }
 
-    private String subject(Notification notification) {
-        return notification.getSubject() == null ||
-            notification.getSubject().isBlank()
+    private String subject(DeliveryContext context) {
+        return context.subject() == null ||
+            context.subject().isBlank()
             ? "NotifyX notification"
-            : notification.getSubject();
+            : context.subject();
     }
 
     private boolean isBlank(String value) {

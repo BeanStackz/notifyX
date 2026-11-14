@@ -4,21 +4,19 @@ import java.util.Map;
 
 import org.springframework.stereotype.Component;
 
-import com.beanstack.notifyx.notification.entity.Notification;
-
-import lombok.RequiredArgsConstructor;
+import com.beanstack.notifyx.delivery.service.DeliveryContext;
 
 @Component
 public class EmailTemplateRenderer {
 
     private static final String DEFAULT_TEMPLATE = "professional";
 
-    public String render(Notification notification) {
-        String templateId = templateId(notification);
-        String organization = escape(notification.getProject().getOrganization().getName());
-        String project = escape(notification.getProject().getName());
-        String subject = escape(subject(notification));
-        String content = escape(notification.getContent()).replace("\r\n", "<br>").replace("\n", "<br>");
+    public String render(DeliveryContext context) {
+        String templateId = templateId(context);
+        String organization = escape(context.organizationName());
+        String project = escape(context.projectName());
+        String subject = escape(subject(context));
+        String content = escape(context.content()).replace("\r\n", "<br>").replace("\n", "<br>");
 
         return switch (templateId) {
             case "minimal" -> minimal(organization, project, subject, content);
@@ -28,10 +26,10 @@ public class EmailTemplateRenderer {
         };
     }
 
-    public String templateId(Notification notification) {
-        Object template = notification.getMetadata() == null
+    public String templateId(DeliveryContext context) {
+        Object template = context.metadata() == null
             ? null
-            : notification.getMetadata().get("emailTemplate");
+            : context.metadata().get("emailTemplate");
         if (template instanceof Map<?, ?> values && values.get("id") != null) {
             return values.get("id").toString().trim().toLowerCase();
         }
@@ -87,10 +85,10 @@ public class EmailTemplateRenderer {
             """.formatted(body);
     }
 
-    private String subject(Notification notification) {
-        return notification.getSubject() == null || notification.getSubject().isBlank()
+    private String subject(DeliveryContext context) {
+        return context.subject() == null || context.subject().isBlank()
             ? "NotifyX notification"
-            : notification.getSubject();
+            : context.subject();
     }
 
     private String escape(String value) {
