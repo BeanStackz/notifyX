@@ -9,6 +9,9 @@ billing, and operational health information.
 
 ## Viewing the API reference
 
+For an offline, portable reference that opens directly from disk without the
+backend or network access, open [API-reference.html](./API-reference.html).
+
 Run the backend, then open:
 
 - Swagger UI: `http://localhost:8080/swagger-ui/index.html`
@@ -16,9 +19,9 @@ Run the backend, then open:
 - OpenAPI YAML: `http://localhost:8080/v3/api-docs.yaml`
 
 The JSON or YAML document can be saved and imported into another OpenAPI viewer
-or API client for standalone viewing. Swagger UI and the OpenAPI document are
-publicly readable; API operations remain protected by their normal security
-requirements.
+or API client. These generated documents require the backend to be running when
+you download them. Swagger UI and the OpenAPI document are publicly readable;
+API operations remain protected by their normal security requirements.
 
 ## Authentication
 

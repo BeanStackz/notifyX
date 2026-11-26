@@ -1,0 +1,538 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Offline API reference for the NotifyX notification backend.">
+  <title>NotifyX Backend API Reference</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: "Segoe UI", Arial, sans-serif;
+      color: #172033;
+      background: #f4f6fb;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; line-height: 1.55; }
+    header {
+      padding: 2.5rem max(1.25rem, calc((100% - 1120px) / 2));
+      color: #fff;
+      background: linear-gradient(120deg, #142d5c, #2563a6);
+    }
+    header h1 { margin: 0 0 .4rem; font-size: clamp(2rem, 5vw, 3rem); }
+    header p { max-width: 760px; margin: 0; color: #e4edff; }
+    main { max-width: 1120px; margin: 2rem auto; padding: 0 1.25rem 3rem; }
+    section, .toolbar {
+      margin: 1rem 0;
+      padding: 1.25rem;
+      border: 1px solid #dfe5ef;
+      border-radius: 12px;
+      background: #fff;
+      box-shadow: 0 2px 8px #1720330b;
+    }
+    h2 { margin: 0 0 .75rem; font-size: 1.35rem; }
+    h3 { margin: 1.25rem 0 .35rem; font-size: 1.05rem; }
+    p { margin: .45rem 0; }
+    code, pre { font-family: Consolas, "Courier New", monospace; }
+    code { overflow-wrap: anywhere; }
+    pre {
+      overflow-x: auto;
+      margin: .5rem 0;
+      padding: .8rem;
+      border-radius: 8px;
+      background: #f2f5fa;
+      font-size: .9rem;
+    }
+    a { color: #1459a6; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; }
+    input, select {
+      min-height: 42px;
+      padding: .55rem .7rem;
+      border: 1px solid #bbc6d7;
+      border-radius: 7px;
+      background: #fff;
+      font: inherit;
+    }
+    input { flex: 1 1 260px; }
+    select { flex: 0 1 190px; }
+    .group-title { margin: 2rem 0 .65rem; }
+    details.endpoint {
+      margin: .55rem 0;
+      border: 1px solid #dfe5ef;
+      border-radius: 9px;
+      background: #fff;
+    }
+    details.endpoint[hidden], .group-title[hidden] { display: none; }
+    summary {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .65rem;
+      align-items: center;
+      padding: .8rem 1rem;
+      cursor: pointer;
+      list-style: none;
+    }
+    summary::-webkit-details-marker { display: none; }
+    summary::after { content: "+"; margin-left: auto; color: #52627a; font-size: 1.2rem; }
+    details[open] summary::after { content: "−"; }
+    .method {
+      min-width: 4.5rem;
+      padding: .15rem .4rem;
+      border-radius: 5px;
+      color: #fff;
+      background: #52627a;
+      text-align: center;
+      font: 700 .76rem Consolas, monospace;
+    }
+    .method.get { background: #197448; }
+    .method.post { background: #1762a7; }
+    .method.put { background: #95620b; }
+    .method.patch { background: #7544a5; }
+    .method.delete { background: #b43e3e; }
+    .path { font-weight: 650; }
+    .auth {
+      margin-left: auto;
+      padding: .1rem .45rem;
+      border: 1px solid #d6deea;
+      border-radius: 99px;
+      color: #52627a;
+      font-size: .78rem;
+    }
+    .endpoint-body { padding: 0 1rem 1rem; border-top: 1px solid #edf0f5; }
+    .endpoint-body p { margin-top: .75rem; }
+    .operation-docs { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
+    .operation-docs section { margin: .8rem 0 0; padding: 0; border: 0; box-shadow: none; }
+    .operation-docs h3 { margin: .8rem 0 .4rem; }
+    .operation-docs table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+    .operation-docs th, .operation-docs td { padding: .5rem; border: 1px solid #dfe5ef; text-align: left; vertical-align: top; }
+    .operation-docs th { background: #f2f5fa; }
+    .request-media { margin: .3rem 0; color: #52627a; font-size: .86rem; }
+    .request-example { margin-top: .65rem; }
+    .request-example summary { display: inline-flex; padding: .3rem 0; color: #1459a6; }
+    .request-example summary::after { content: ""; }
+    .note { color: #52627a; }
+    .warning {
+      padding: .7rem .85rem;
+      border-left: 4px solid #d29220;
+      background: #fff8e9;
+    }
+    footer { padding-top: 1rem; color: #52627a; font-size: .9rem; }
+    @media (max-width: 600px) {
+      header { padding-top: 1.7rem; padding-bottom: 1.7rem; }
+      .auth { margin-left: 0; }
+      summary { gap: .45rem; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>NotifyX Backend API</h1>
+    <p>Offline reference for the multi-tenant notification service: organizations, projects, API keys, asynchronous notification delivery, tracking, analytics, billing, and operations.</p>
+  </header>
+  <main>
+    <section>
+      <h2>About NotifyX</h2>
+      <p>NotifyX lets users create organizations and projects, issue project-scoped API keys, and submit idempotent email notifications. Accepted notifications are stored with an outbox event and processed asynchronously through RabbitMQ and the configured provider.</p>
+      <p>This file is self-contained. Save or copy <code>API-reference.html</code> and open it directly in a browser; no backend, local server, Swagger installation, or network connection is required.</p>
+    </section>
+
+    <section>
+      <h2>Authentication and responses</h2>
+      <ul>
+        <li><strong>JWT:</strong> protected user and management endpoints require <code>Authorization: Bearer &lt;access-token&gt;</code>.</li>
+        <li><strong>Project API key:</strong> ingestion endpoints require <code>X-NotifyX-API-Key</code>.</li>
+        <li><strong>Public auth:</strong> register, login, and refresh do not require a JWT; logout does.</li>
+        <li><strong>Provider webhooks:</strong> Brevo uses <code>X-Brevo-Webhook-Key</code> or a Bearer webhook secret; Razorpay uses its signature and event-ID headers.</li>
+      </ul>
+      <p>Most successful responses use this envelope. Webhook responses are empty.</p>
+      <pre>{
+  "success": true,
+  "message": "Request completed successfully",
+  "data": {},
+  "timestamp": "2026-01-01T12:00:00Z"
+}</pre>
+    </section>
+
+    <section>
+      <h2>Projects</h2>
+      <p>A project belongs to an organization and isolates its notifications and API keys. It has a name, a slug unique within its organization, an optional description (up to 500 characters), a lifecycle status, and creation/update timestamps. Organization owners and administrators can create, update, and archive projects; members can list and view them.</p>
+      <p>Project slugs are lowercase alphanumeric values separated by single hyphens. Archived projects cannot be updated or used as active notification destinations.</p>
+    </section>
+
+    <section>
+      <h2>Request shapes</h2>
+      <p>All request bodies are JSON. Fields not listed as required are optional unless the endpoint description says otherwise.</p>
+      <h3>Authentication and profile</h3>
+      <ul>
+        <li><code>RegisterRequest</code>: <code>fullName</code>, <code>email</code>, <code>password</code>.</li>
+        <li><code>LoginRequest</code>: <code>email</code>, <code>password</code>.</li>
+        <li><code>RefreshTokenRequest</code>: <code>refreshToken</code>.</li>
+        <li><code>UpdateProfileRequest</code>: <code>fullName</code>.</li>
+      </ul>
+      <h3>Organization and project management</h3>
+      <ul>
+        <li><code>CreateOrganizationRequest</code>: <code>name</code>, <code>slug</code>.</li>
+        <li><code>CreateProjectRequest</code> / <code>UpdateProjectRequest</code>: <code>name</code>, <code>slug</code>, optional <code>description</code>.</li>
+        <li><code>CreateApiKeyRequest</code>: <code>name</code>, optional <code>expiresInDays</code> (1–3650).</li>
+      </ul>
+      <h3>Notifications and billing</h3>
+      <ul>
+        <li><code>CreateNotificationRequest</code>: required <code>channel</code>, <code>recipient</code>, <code>content</code>; optional <code>subject</code>, <code>metadata</code>, <code>scheduledAt</code>. Also requires the <code>Idempotency-Key</code> header.</li>
+        <li><code>SelectPlanRequest</code>: <code>planCode</code>.</li>
+        <li><code>VerifyPaymentRequest</code>: <code>razorpayOrderId</code>, <code>razorpayPaymentId</code>, <code>razorpaySignature</code>.</li>
+        <li><code>VerifySubscriptionPaymentRequest</code>: <code>razorpayPaymentId</code>, <code>razorpaySubscriptionId</code>, <code>razorpaySignature</code>.</li>
+      </ul>
+      <p class="warning"><strong>Scheduling note:</strong> <code>scheduledAt</code> is accepted and stored, but the current outbox publisher does not delay delivery until that time.</p>
+    </section>
+
+    <div class="toolbar" role="search">
+      <label for="search">Find an endpoint</label>
+      <input id="search" type="search" placeholder="Search path, method, or description">
+      <label for="auth-filter">Authentication</label>
+      <select id="auth-filter">
+        <option value="">All endpoints</option>
+        <option value="JWT">JWT</option>
+        <option value="API key">API key</option>
+        <option value="Webhook">Webhook</option>
+        <option value="Public">Public</option>
+      </select>
+      <span id="result-count" class="note" aria-live="polite"></span>
+    </div>
+
+    <h2 class="group-title">Authentication</h2>
+    <details class="endpoint" data-auth="Public"><summary><span class="method post">POST</span><code class="path">/api/v1/auth/register</code><span class="auth">Public</span></summary><div class="endpoint-body"><p>Creates a user account. Body: <code>RegisterRequest</code>.</p></div></details>
+    <details class="endpoint" data-auth="Public"><summary><span class="method post">POST</span><code class="path">/api/v1/auth/login</code><span class="auth">Public</span></summary><div class="endpoint-body"><p>Validates credentials and returns access and refresh tokens. Body: <code>LoginRequest</code>.</p></div></details>
+    <details class="endpoint" data-auth="Public"><summary><span class="method post">POST</span><code class="path">/api/v1/auth/refresh</code><span class="auth">Public</span></summary><div class="endpoint-body"><p>Exchanges a valid refresh token for a new token pair. Body: <code>RefreshTokenRequest</code>.</p></div></details>
+    <details class="endpoint" data-auth="JWT"><summary><span class="method post">POST</span><code class="path">/api/v1/auth/logout</code><span class="auth">JWT</span></summary><div class="endpoint-body"><p>Revokes the supplied refresh token for the authenticated user. Body: <code>RefreshTokenRequest</code>.</p></div></details>
+
+    <h2 class="group-title">Profile</h2>
+    <details class="endpoint" data-auth="JWT"><summary><span class="method get">GET</span><code class="path">/api/v1/users/profile</code><span class="auth">JWT</span></summary><div class="endpoint-body"><p>Returns the authenticated user's profile access information.</p></div></details>
+    <details class="endpoint" data-auth="JWT"><summary><span class="method put">PUT</span><code class="path">/api/v1/users/profile</code><span class="auth">JWT</span></summary><div class="endpoint-body"><p>Updates the authenticated user's display name. Body: <code>UpdateProfileRequest</code>.</p></div></details>
+
+    <h2 class="group-title">Organizations</h2>
+    <details class="endpoint" data-auth="JWT"><summary><span class="method post">POST</span><code class="path">/api/v1/organizations</code><span class="auth">JWT</span></summary><div class="endpoint-body"><p>Creates an organization and adds the authenticated user as its owner. Body: <code>CreateOrganizationRequest</code>.</p></div></details>
+    <details class="endpoint" data-auth="JWT"><summary><span class="method get">GET</span><code class="path">/api/v1/organizations</code><span class="auth">JWT</span></summary><div class="endpoint-body"><p>Lists organizations the authenticated user belongs to.</p></div></details>
+    <details class="endpoint" data-auth="JWT"><summary><span class="method get">GET</span><code class="path">/api/v1/organizations/{organizationId}</code><span class="auth">JWT</span></summary><div class="endpoint-body"><p>Returns one organization if the authenticated user is a member. Path parameter: <code>organizationId</code> (UUID).</p></div></details>
+
+    <h2 class="group-title">Projects</h2>
+    <details class="endpoint" data-auth="JWT"><summary><span class="method post">POST</span><code class="path">/api/v1/organizations/{organizationId}/projects</code><span class="auth">JWT</span></summary><div class="endpoint-body"><p>Creates a project. Requires organization owner or administrator privileges. Body: <code>CreateProjectRequest</code>.</p></div></details>
+    <details class="endpoint" data-auth="JWT"><summary><span class="method get">GET</span><code class="path">/api/v1/organizations/{organizationId}/projects</code><span class="auth">JWT</span></summary><div class="endpoint-body"><p>Lists projects in an organization the authenticated user belongs to.</p></div></details>
+    <details class="endpoint" data-auth="JWT"><summary><span class="method get">GET</span><code class="path">/api/v1/organizations/{organizationId}/projects/{projectId}</code><span class="auth">JWT</span></summary><div class="endpoint-body"><p>Returns a project in the specified organization. Path parameters are UUIDs.</p></div></details>
+    <details class="endpoint" data-auth="JWT"><summary><span class="method put">PUT</span><code class="path">/api/v1/organizations/{organizationId}/projects/{projectId}</code><span class="auth">JWT</span></summary><div class="endpoint-body"><p>Replaces project name, slug, and optional description. Requires organization owner or administrator privileges. Body: <code>UpdateProjectRequest</code>.</p></div></details>
+    <details class="endpoint" data-auth="JWT"><summary><span class="method patch">PATCH</span><code class="path">/api/v1/organizations/{organizationId}/projects/{projectId}/archive</code><span class="auth">JWT</span></summary><div class="endpoint-body"><p>Archives a project. Requires organization owner or administrator privileges. This API does not reactivate archived projects.</p></div></details>
+
+    <h2 class="group-title">API keys</h2>
+    <details class="endpoint" data-auth="JWT"><summary><span class="method post">POST</span><code class="path">/api/v1/organizations/{organizationId}/projects/{projectId}/api-keys</code><span class="auth">JWT</span></summary><div class="endpoint-body"><p>Creates a project API key. The secret is returned only once. Body: <code>CreateApiKeyRequest</code>.</p></div></details>
+    <details class="endpoint" data-auth="JWT"><summary><span class="method get">GET</span><code class="path">/api/v1/organizations/{organizationId}/projects/{projectId}/api-keys</code><span class="auth">JWT</span></summary><div class="endpoint-body"><p>Lists project API-key metadata; secret values are not returned.</p></div></details>
+    <details class="endpoint" data-auth="JWT"><summary><span class="method delete">DELETE</span><code class="path">/api/v1/organizations/{organizationId}/projects/{projectId}/api-keys/{apiKeyId}</code><span class="auth">JWT</span></summary><div class="endpoint-body"><p>Revokes an API key belonging to the specified project. Path parameters are UUIDs.</p></div></details>
+
+    <h2 class="group-title">Notification ingestion</h2>
+    <details class="endpoint" data-auth="API key"><summary><span class="method get">GET</span><code class="path">/api/v1/ingest/whoami</code><span class="auth">API key</span></summary><div class="endpoint-body"><p>Returns the project identity associated with the supplied <code>X-NotifyX-API-Key</code>.</p></div></details>
+    <details class="endpoint" data-auth="API key"><summary><span class="method post">POST</span><code class="path">/api/v1/ingest/notifications</code><span class="auth">API key</span></summary><div class="endpoint-body"><p>Accepts a notification for asynchronous delivery and returns <code>202 Accepted</code>. Requires <code>X-NotifyX-API-Key</code> and <code>Idempotency-Key</code> headers. Body: <code>CreateNotificationRequest</code>. Idempotency is scoped to the project.</p></div></details>
+
+    <h2 class="group-title">Delivery tracking</h2>
+    <details class="endpoint" data-auth="JWT"><summary><span class="method get">GET</span><code class="path">/api/v1/projects/{projectId}/notifications</code><span class="auth">JWT</span></summary><div class="endpoint-body"><p>Lists notification history for a project accessible to the authenticated user.</p></div></details>
+    <details class="endpoint" data-auth="JWT"><summary><span class="method get">GET</span><code class="path">/api/v1/projects/{projectId}/notifications/{notificationId}</code><span class="auth">JWT</span></summary><div class="endpoint-body"><p>Returns notification state, provider delivery attempts, and lifecycle events. Path parameters are UUIDs.</p></div></details>
+    <details class="endpoint" data-auth="JWT"><summary><span class="method post">POST</span><code class="path">/api/v1/projects/{projectId}/notifications/{notificationId}/retry</code><span class="auth">JWT</span></summary><div class="endpoint-body"><p>Queues another delivery attempt for the notification. Path parameters are UUIDs.</p></div></details>
+
+    <h2 class="group-title">Provider webhooks</h2>
+    <details class="endpoint" data-auth="Webhook"><summary><span class="method post">POST</span><code class="path">/api/v1/webhooks/brevo</code><span class="auth">Webhook</span></summary><div class="endpoint-body"><p>Processes a raw Brevo delivery event. Authenticate with <code>X-Brevo-Webhook-Key</code> or <code>Authorization: Bearer &lt;webhook-secret&gt;</code>. Returns an empty response.</p></div></details>
+    <details class="endpoint" data-auth="Webhook"><summary><span class="method post">POST</span><code class="path">/api/v1/webhooks/razorpay</code><span class="auth">Webhook</span></summary><div class="endpoint-body"><p>Processes a raw Razorpay event after signature verification. Requires <code>X-Razorpay-Signature</code> and <code>x-razorpay-event-id</code>. Returns an empty response.</p></div></details>
+
+    <h2 class="group-title">Analytics and operations</h2>
+    <details class="endpoint" data-auth="JWT"><summary><span class="method get">GET</span><code class="path">/api/v1/organizations/{organizationId}/analytics</code><span class="auth">JWT</span></summary><div class="endpoint-body"><p>Returns notification counts by status/channel, daily totals, and delivery rate. Optional query parameter <code>days</code> accepts 7 or 30; defaults to 30.</p></div></details>
+    <details class="endpoint" data-auth="JWT"><summary><span class="method get">GET</span><code class="path">/api/v1/health/operations</code><span class="auth">JWT</span></summary><div class="endpoint-body"><p>Reports RabbitMQ and Brevo status, pending outbox backlog, and dead-letter queue count.</p></div></details>
+    <details class="endpoint" data-auth="JWT"><summary><span class="method get">GET</span><code class="path">/api/v1/admin/dashboard</code><span class="auth">JWT</span></summary><div class="endpoint-body"><p>Returns aggregate user, organization, project, and notification counts. Requires the ADMIN role.</p></div></details>
+
+    <h2 class="group-title">Plans and billing</h2>
+    <details class="endpoint" data-auth="JWT"><summary><span class="method get">GET</span><code class="path">/api/v1/plans</code><span class="auth">JWT</span></summary><div class="endpoint-body"><p>Lists plans with pricing, quota, rate limits, priority, and allowed channels.</p></div></details>
+    <details class="endpoint" data-auth="JWT"><summary><span class="method post">POST</span><code class="path">/api/v1/organizations/{organizationId}/billing/checkout</code><span class="auth">JWT</span></summary><div class="endpoint-body"><p>Creates a Razorpay billing order for the selected plan. Body: <code>SelectPlanRequest</code>.</p></div></details>
+    <details class="endpoint" data-auth="JWT"><summary><span class="method post">POST</span><code class="path">/api/v1/organizations/{organizationId}/billing/verify</code><span class="auth">JWT</span></summary><div class="endpoint-body"><p>Verifies payment for an organization billing order. Body: <code>VerifyPaymentRequest</code>.</p></div></details>
+    <details class="endpoint" data-auth="JWT"><summary><span class="method get">GET</span><code class="path">/api/v1/organizations/{organizationId}/subscription</code><span class="auth">JWT</span></summary><div class="endpoint-body"><p>Returns current subscription status and remaining notification quota.</p></div></details>
+    <details class="endpoint" data-auth="JWT"><summary><span class="method post">POST</span><code class="path">/api/v1/organizations/{organizationId}/subscription/checkout</code><span class="auth">JWT</span></summary><div class="endpoint-body"><p>Starts a Razorpay subscription checkout. Body: <code>SelectPlanRequest</code>.</p></div></details>
+    <details class="endpoint" data-auth="JWT"><summary><span class="method post">POST</span><code class="path">/api/v1/organizations/{organizationId}/subscription/{subscriptionId}/verify</code><span class="auth">JWT</span></summary><div class="endpoint-body"><p>Verifies checkout details; activation completes asynchronously through the provider webhook. Body: <code>VerifySubscriptionPaymentRequest</code>.</p></div></details>
+    <details class="endpoint" data-auth="JWT"><summary><span class="method post">POST</span><code class="path">/api/v1/organizations/{organizationId}/subscription/cancel</code><span class="auth">JWT</span></summary><div class="endpoint-body"><p>Schedules cancellation of the current organization subscription.</p></div></details>
+
+    <footer>
+      <p>NotifyX API v1. This offline reference is a snapshot of the backend routes; refresh it when API routes or behavior change.</p>
+      <p>When the backend is available, the generated OpenAPI specification and interactive Swagger UI are served by the application.</p>
+    </footer>
+  </main>
+  <script>
+    (function () {
+      var search = document.getElementById("search");
+      var authFilter = document.getElementById("auth-filter");
+      var endpoints = Array.prototype.slice.call(document.querySelectorAll(".endpoint"));
+      var headings = Array.prototype.slice.call(document.querySelectorAll(".group-title"));
+      var count = document.getElementById("result-count");
+
+      var schemas = {
+        RegisterRequest: {
+          properties: [
+            ["fullName", "string", true, "Full name; 2–100 characters.", "Alex Morgan"],
+            ["email", "string (email)", true, "Valid email address; maximum 100 characters.", "alex@example.com"],
+            ["password", "string", true, "Password; 4–100 characters.", "your-password"]
+          ]
+        },
+        LoginRequest: {
+          properties: [
+            ["email", "string (email)", true, "Valid email address.", "alex@example.com"],
+            ["password", "string", true, "Password; 4–100 characters.", "your-password"]
+          ]
+        },
+        RefreshTokenRequest: {
+          properties: [["refreshToken", "string", true, "Refresh token to exchange or revoke.", "your-refresh-token"]]
+        },
+        UpdateProfileRequest: {
+          properties: [["fullName", "string", true, "Required; maximum 100 characters.", "Alex Morgan"]]
+        },
+        CreateOrganizationRequest: {
+          properties: [
+            ["name", "string", true, "Required; maximum 100 characters.", "Acme"],
+            ["slug", "string", true, "Required; lowercase letters/numbers separated by single hyphens; maximum 100 characters.", "acme"]
+          ]
+        },
+        CreateProjectRequest: {
+          properties: [
+            ["name", "string", true, "Required; maximum 150 characters.", "Transactional email"],
+            ["slug", "string", true, "Required; lowercase letters/numbers separated by single hyphens; unique in the organization.", "transactional-email"],
+            ["description", "string", false, "Optional; maximum 500 characters.", "Production email notifications"]
+          ]
+        },
+        UpdateProjectRequest: {
+          properties: [
+            ["name", "string", true, "Required; maximum 150 characters.", "Transactional email"],
+            ["slug", "string", true, "Required; letters/numbers separated by single hyphens; unique in the organization.", "transactional-email"],
+            ["description", "string", false, "Optional; maximum 500 characters.", "Production email notifications"]
+          ]
+        },
+        CreateApiKeyRequest: {
+          properties: [
+            ["name", "string", true, "Required; maximum 100 characters.", "Production ingestion"],
+            ["expiresInDays", "integer", false, "Optional; from 1 to 3650 days.", 90]
+          ]
+        },
+        CreateNotificationRequest: {
+          properties: [
+            ["channel", "string (enum)", true, "EMAIL, SMS, PUSH, or IN_APP; the active plan must allow the channel.", "EMAIL"],
+            ["recipient", "string", true, "Required; maximum 320 characters.", "alex@example.com"],
+            ["subject", "string", false, "Optional; maximum 255 characters.", "Your order is confirmed"],
+            ["content", "string", true, "Required; maximum 10000 characters.", "Thanks for your order."],
+            ["metadata", "object", false, "Optional arbitrary JSON metadata.", { "orderId": "ord-123" }],
+            ["scheduledAt", "string (date-time)", false, "Optional timestamp. Stored, but does not currently delay delivery.", "2026-12-01T10:00:00Z"]
+          ]
+        },
+        SelectPlanRequest: {
+          properties: [["planCode", "string", true, "Required; maximum 30 characters.", "pro"]]
+        },
+        VerifyPaymentRequest: {
+          properties: [
+            ["razorpayOrderId", "string", true, "Razorpay order identifier.", "order_example"],
+            ["razorpayPaymentId", "string", true, "Razorpay payment identifier.", "pay_example"],
+            ["razorpaySignature", "string", true, "Razorpay payment signature.", "signature"]
+          ]
+        },
+        VerifySubscriptionPaymentRequest: {
+          properties: [
+            ["razorpayPaymentId", "string", true, "Razorpay payment identifier.", "pay_example"],
+            ["razorpaySubscriptionId", "string", true, "Razorpay subscription identifier.", "sub_example"],
+            ["razorpaySignature", "string", true, "Razorpay checkout signature.", "signature"]
+          ]
+        }
+      };
+
+      var requestBodies = {
+        "POST /api/v1/auth/register": "RegisterRequest",
+        "POST /api/v1/auth/login": "LoginRequest",
+        "POST /api/v1/auth/refresh": "RefreshTokenRequest",
+        "POST /api/v1/auth/logout": "RefreshTokenRequest",
+        "PUT /api/v1/users/profile": "UpdateProfileRequest",
+        "POST /api/v1/organizations": "CreateOrganizationRequest",
+        "POST /api/v1/organizations/{organizationId}/projects": "CreateProjectRequest",
+        "PUT /api/v1/organizations/{organizationId}/projects/{projectId}": "UpdateProjectRequest",
+        "POST /api/v1/organizations/{organizationId}/projects/{projectId}/api-keys": "CreateApiKeyRequest",
+        "POST /api/v1/ingest/notifications": "CreateNotificationRequest",
+        "POST /api/v1/organizations/{organizationId}/billing/checkout": "SelectPlanRequest",
+        "POST /api/v1/organizations/{organizationId}/billing/verify": "VerifyPaymentRequest",
+        "POST /api/v1/organizations/{organizationId}/subscription/checkout": "SelectPlanRequest",
+        "POST /api/v1/organizations/{organizationId}/subscription/{subscriptionId}/verify": "VerifySubscriptionPaymentRequest"
+      };
+
+      var rawWebhookBodies = {
+        "POST /api/v1/webhooks/brevo": "Provider-defined Brevo webhook event JSON.",
+        "POST /api/v1/webhooks/razorpay": "Provider-defined Razorpay webhook event JSON."
+      };
+
+      var extraParameters = {
+        "POST /api/v1/ingest/notifications": [
+          ["Idempotency-Key", "header", "string", true, "Client-generated key unique within the project."]
+        ],
+        "POST /api/v1/webhooks/brevo": [
+          ["X-Brevo-Webhook-Key", "header", "string", false, "Webhook secret. Alternatively provide the secret as a Bearer value in Authorization."],
+          ["Authorization", "header", "string", false, "Optional Bearer webhook secret; use instead of X-Brevo-Webhook-Key."]
+        ],
+        "POST /api/v1/webhooks/razorpay": [
+          ["X-Razorpay-Signature", "header", "string", true, "Signature used to verify the webhook payload."],
+          ["x-razorpay-event-id", "header", "string", true, "Unique Razorpay event identifier."]
+        ],
+        "GET /api/v1/organizations/{organizationId}/analytics": [
+          ["days", "query", "integer", false, "Analytics period: 7 or 30 days; defaults to 30."]
+        ]
+      };
+
+      function makeTable(headers, rows) {
+        var table = document.createElement("table");
+        var head = document.createElement("thead");
+        var headerRow = document.createElement("tr");
+        headers.forEach(function (label) {
+          var cell = document.createElement("th");
+          cell.textContent = label;
+          headerRow.appendChild(cell);
+        });
+        head.appendChild(headerRow);
+        table.appendChild(head);
+
+        var body = document.createElement("tbody");
+        rows.forEach(function (row) {
+          var tableRow = document.createElement("tr");
+          row.forEach(function (value) {
+            var cell = document.createElement("td");
+            if (value instanceof Node) cell.appendChild(value);
+            else cell.textContent = String(value);
+            tableRow.appendChild(cell);
+          });
+          body.appendChild(tableRow);
+        });
+        table.appendChild(body);
+        return table;
+      }
+
+      function addPathParameters(path, rows) {
+        var descriptions = {
+          organizationId: "UUID of the organization.",
+          projectId: "UUID of the project.",
+          notificationId: "UUID of the notification.",
+          apiKeyId: "UUID of the API key.",
+          subscriptionId: "UUID of the subscription."
+        };
+        var match;
+        var pattern = /\{([^}]+)\}/g;
+        while ((match = pattern.exec(path)) !== null) {
+          var name = match[1];
+          rows.push([name, "path", "string (UUID)", "Yes", descriptions[name] || "UUID path parameter."]);
+        }
+      }
+
+      function renderOperationDocs(endpoint) {
+        var method = endpoint.querySelector(".method").textContent.trim();
+        var path = endpoint.querySelector(".path").textContent.trim();
+        var key = method + " " + path;
+        var params = [];
+        addPathParameters(path, params);
+        (extraParameters[key] || []).forEach(function (parameter) {
+          params.push([parameter[0], parameter[1], parameter[2], parameter[3] ? "Yes" : "No", parameter[4]]);
+        });
+
+        var docs = document.createElement("div");
+        docs.className = "operation-docs";
+
+        var parameterSection = document.createElement("section");
+        var parameterTitle = document.createElement("h3");
+        parameterTitle.textContent = "Parameters";
+        parameterSection.appendChild(parameterTitle);
+        if (params.length) {
+          parameterSection.appendChild(makeTable(
+            ["Name", "In", "Type", "Required", "Description"],
+            params
+          ));
+        } else {
+          var noParams = document.createElement("p");
+          noParams.className = "note";
+          noParams.textContent = "No path, query, or header parameters.";
+          parameterSection.appendChild(noParams);
+        }
+        docs.appendChild(parameterSection);
+
+        var bodySection = document.createElement("section");
+        var bodyTitle = document.createElement("h3");
+        bodyTitle.textContent = "Request body";
+        bodySection.appendChild(bodyTitle);
+        var schemaName = requestBodies[key];
+
+        if (schemaName) {
+          var schema = schemas[schemaName];
+          var media = document.createElement("p");
+          media.className = "request-media";
+          media.textContent = "application/json · required · schema: " + schemaName;
+          bodySection.appendChild(media);
+          bodySection.appendChild(makeTable(
+            ["Property", "Type", "Required", "Description"],
+            schema.properties.map(function (property) {
+              return [property[0], property[1], property[2] ? "Yes" : "No", property[3]];
+            })
+          ));
+
+          var example = document.createElement("details");
+          example.className = "request-example";
+          var exampleTitle = document.createElement("summary");
+          exampleTitle.textContent = "Example Value";
+          example.appendChild(exampleTitle);
+          var exampleCode = document.createElement("pre");
+          var exampleValue = {};
+          schema.properties.forEach(function (property) {
+            exampleValue[property[0]] = property[4];
+          });
+          exampleCode.textContent = JSON.stringify(exampleValue, null, 2);
+          example.appendChild(exampleCode);
+          bodySection.appendChild(example);
+        } else if (rawWebhookBodies[key]) {
+          var rawDescription = document.createElement("p");
+          rawDescription.textContent = "application/json · required · " + rawWebhookBodies[key];
+          bodySection.appendChild(rawDescription);
+        } else {
+          var noBody = document.createElement("p");
+          noBody.className = "note";
+          noBody.textContent = "No request body.";
+          bodySection.appendChild(noBody);
+        }
+        docs.appendChild(bodySection);
+        endpoint.querySelector(".endpoint-body").appendChild(docs);
+      }
+
+      endpoints.forEach(renderOperationDocs);
+
+      function filterEndpoints() {
+        var term = search.value.toLowerCase().trim();
+        var auth = authFilter.value;
+        var visible = 0;
+
+        endpoints.forEach(function (endpoint) {
+          var matchesText = endpoint.textContent.toLowerCase().indexOf(term) !== -1;
+          var matchesAuth = !auth || endpoint.getAttribute("data-auth") === auth;
+          endpoint.hidden = !(matchesText && matchesAuth);
+          if (!endpoint.hidden) visible += 1;
+        });
+
+        headings.forEach(function (heading) {
+          var next = heading.nextElementSibling;
+          var hasVisibleEndpoint = false;
+          while (next && !next.classList.contains("group-title")) {
+            if (next.classList.contains("endpoint") && !next.hidden) {
+              hasVisibleEndpoint = true;
+              break;
+            }
+            next = next.nextElementSibling;
+          }
+          heading.hidden = !hasVisibleEndpoint;
+        });
+
+        count.textContent = visible + " endpoint" + (visible === 1 ? "" : "s");
+      }
+
+      search.addEventListener("input", filterEndpoints);
+      authFilter.addEventListener("change", filterEndpoints);
+      filterEndpoints();
+    }());
+  </script>
+</body>
+</html>
