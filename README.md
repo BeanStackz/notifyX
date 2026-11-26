@@ -1,6 +1,18 @@
 
 # NotifyX – Distributed Notification & Communication Platform
 
+<p align="center">
+  <a href="https://beanstackz.github.io/notifyX/API-reference.html">
+    <img src="https://img.shields.io/badge/API%20Endpoints-Explore%20the%20API-2563EB?style=for-the-badge&amp;logo=swagger&amp;logoColor=white" alt="Explore the NotifyX API endpoints">
+  </a>
+</p>
+
+<p align="center">
+  <a href="#technology-stack">
+    <img src="https://skillicons.dev/icons?i=java,spring,postgres,redis,rabbitmq,react,ts,vite" alt="NotifyX technology stack: Java, Spring Boot, PostgreSQL, Redis, RabbitMQ, React, TypeScript, and Vite">
+  </a>
+</p>
+
 NotifyX is a multi-tenant notification platform designed to help applications integrate and manage notifications through a centralized API.
 
 The platform provides organization and project management, secure API key authentication, JWT-based identity management, notification ingestion, asynchronous delivery, priority-based message processing, retry handling, and delivery tracking.
@@ -518,6 +530,7 @@ Key areas for monitoring include:
 
 ---
 
+<a id="technology-stack"></a>
 ## 🖥️ Technology Stack
 
 ### Backend
