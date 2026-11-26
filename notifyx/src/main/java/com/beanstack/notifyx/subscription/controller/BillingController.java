@@ -14,16 +14,22 @@ import com.beanstack.notifyx.subscription.dto.request.VerifyPaymentRequest;
 import com.beanstack.notifyx.subscription.dto.response.BillingCheckoutResponse;
 import com.beanstack.notifyx.subscription.service.SubscriptionService;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/v1/organizations/{organizationId}/billing")
 @RequiredArgsConstructor
+@Tag(name = "Billing", description = "Create and verify one-time billing orders for an organization.")
+@SecurityRequirement(name = "bearerAuth")
 public class BillingController {
     private final SubscriptionService subscriptionService;
 
     @PostMapping("/checkout")
+    @Operation(summary = "Create billing checkout", description = "Creates a Razorpay billing order for the selected plan.")
     public ResponseEntity<ApiResponse<BillingCheckoutResponse>> checkout(
         @PathVariable UUID organizationId,
         @Valid @RequestBody SelectPlanRequest request,
@@ -38,6 +44,7 @@ public class BillingController {
     }
 
     @PostMapping("/verify")
+    @Operation(summary = "Verify billing payment", description = "Verifies a Razorpay payment for the organization billing order.")
     public ResponseEntity<ApiResponse<Void>> verify(
         @PathVariable UUID organizationId,
         @Valid @RequestBody VerifyPaymentRequest request,

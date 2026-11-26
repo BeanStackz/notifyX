@@ -12,15 +12,21 @@ import com.beanstack.notifyx.notification.dto.response.NotificationResponse;
 import com.beanstack.notifyx.delivery.service.DeliveryTrackingService;
 import com.beanstack.notifyx.shared.response.ApiResponse;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/v1/projects/{projectId}/notifications")
 @RequiredArgsConstructor
+@Tag(name = "Delivery tracking", description = "Review notification state and delivery attempts, and request retries.")
+@SecurityRequirement(name = "bearerAuth")
 public class DeliveryTrackingController {
     private final DeliveryTrackingService trackingService;
 
     @GetMapping
+    @Operation(summary = "List project notifications", description = "Lists notification history for a project accessible to the authenticated user.")
     public ApiResponse<List<NotificationResponse>> listNotifications(
         @PathVariable UUID projectId,
         @AuthenticationPrincipal UserDetails userDetails
@@ -32,6 +38,7 @@ public class DeliveryTrackingController {
     }
 
     @GetMapping("/{notificationId}")
+    @Operation(summary = "Get delivery tracking", description = "Returns a notification's state, provider attempts, and delivery lifecycle events.")
     public ApiResponse<DeliveryTrackingResponse> getTracking(
         @PathVariable UUID projectId,
         @PathVariable UUID notificationId,
@@ -44,6 +51,7 @@ public class DeliveryTrackingController {
     }
 
     @PostMapping("/{notificationId}/retry")
+    @Operation(summary = "Retry notification", description = "Queues another delivery attempt for a notification in the specified project.")
     public ApiResponse<Void> retry(
         @PathVariable UUID projectId,
         @PathVariable UUID notificationId,

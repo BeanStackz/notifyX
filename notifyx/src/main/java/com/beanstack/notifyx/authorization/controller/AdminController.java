@@ -14,9 +14,15 @@ import com.beanstack.notifyx.notification.repository.NotificationRepository;
 import com.beanstack.notifyx.authorization.dto.AdminDashboardResponse;
 import lombok.RequiredArgsConstructor;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 @RestController 
 @RequestMapping ("/api/v1/admin")
 @RequiredArgsConstructor
+@Tag(name = "Administration", description = "System-wide administrative summaries.")
+@SecurityRequirement(name = "bearerAuth")
 public class AdminController {
 
     private final UserRepository userRepository;
@@ -25,6 +31,7 @@ public class AdminController {
     private final NotificationRepository notificationRepository;
 
     @GetMapping ("/dashboard")
+    @Operation(summary = "Get admin dashboard", description = "Returns aggregate user, organization, project, and notification counts. Requires the ADMIN role.")
     @PreAuthorize ("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<AdminDashboardResponse>> dashboard(){
         return ResponseEntity.ok(

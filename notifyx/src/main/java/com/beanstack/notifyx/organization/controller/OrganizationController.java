@@ -19,17 +19,23 @@ import com.beanstack.notifyx.organization.dto.response.OrganizationResponse;
 import com.beanstack.notifyx.organization.service.OrganizationService;
 import com.beanstack.notifyx.shared.response.ApiResponse;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 @RestController 
 @RequiredArgsConstructor 
 @RequestMapping ("/api/v1/organizations")
+@Tag(name = "Organizations", description = "Manage organizations and retrieve organizations the current user belongs to.")
+@SecurityRequirement(name = "bearerAuth")
 public class OrganizationController {
 
     private final OrganizationService organizationService;
 
     @PostMapping 
+    @Operation(summary = "Create organization", description = "Creates an organization and adds the authenticated user as its owner.")
     public ResponseEntity<ApiResponse<OrganizationResponse>> createOrganization(
         @AuthenticationPrincipal UserDetails userDetails,
         @Valid @RequestBody CreateOrganizationRequest request) {
@@ -40,6 +46,7 @@ public class OrganizationController {
     }
 
     @GetMapping 
+    @Operation(summary = "List my organizations", description = "Lists organizations the authenticated user is a member of.")
     public ResponseEntity<ApiResponse<List<OrganizationResponse>>> getMyOrganizations(
         @AuthenticationPrincipal UserDetails userDetails) {
 
@@ -48,6 +55,7 @@ public class OrganizationController {
     }
 
     @GetMapping ("/{organizationId}")
+    @Operation(summary = "Get organization", description = "Returns an organization when the authenticated user is a member.")
     public ResponseEntity<ApiResponse<OrganizationResponse>> getOrganization(
         @AuthenticationPrincipal UserDetails userDetails,
         @PathVariable UUID organizationId) {

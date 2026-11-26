@@ -8,16 +8,23 @@ import java.security.MessageDigest;
 import com.beanstack.notifyx.delivery.config.BrevoProperties;
 import com.beanstack.notifyx.delivery.service.BrevoWebhookService;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/v1/webhooks/brevo")
 @RequiredArgsConstructor
+@Tag(name = "Provider webhooks", description = "Provider callbacks authenticated with provider-specific secrets or signatures.")
 public class BrevoWebhookController {
     private final BrevoWebhookService webhookService;
     private final BrevoProperties properties;
 
     @PostMapping
+    @Operation(
+        summary = "Receive Brevo webhook",
+        description = "Processes a raw Brevo delivery event. Authenticate with X-Brevo-Webhook-Key or Authorization: Bearer <webhook-secret>; requests with an invalid or unconfigured secret are rejected."
+    )
     public ResponseEntity<Void> receive(
         @RequestBody byte[] rawBody,
         @RequestHeader(value = "X-Brevo-Webhook-Key", required = false)

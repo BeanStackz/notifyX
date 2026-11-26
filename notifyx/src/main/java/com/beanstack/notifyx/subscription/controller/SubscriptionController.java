@@ -20,17 +20,23 @@ import com.beanstack.notifyx.subscription.dto.response.SubscriptionCheckoutRespo
 import com.beanstack.notifyx.subscription.dto.response.SubscriptionResponse;
 import com.beanstack.notifyx.subscription.service.SubscriptionService;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/v1/organizations/{organizationId}/subscription")
 @RequiredArgsConstructor
+@Tag(name = "Subscriptions", description = "View organization subscription status, start checkout, verify payment, or schedule cancellation.")
+@SecurityRequirement(name = "bearerAuth")
 public class SubscriptionController {
 
     private final SubscriptionService subscriptionService;
 
     @GetMapping
+    @Operation(summary = "Get subscription", description = "Returns the current subscription and remaining notification quota for an organization.")
     public ResponseEntity<ApiResponse<SubscriptionResponse>> getSubscription(
         @PathVariable UUID organizationId,
         @AuthenticationPrincipal UserDetails userDetails
@@ -47,6 +53,7 @@ public class SubscriptionController {
     }
 
     @PostMapping("/checkout")
+    @Operation(summary = "Create subscription checkout", description = "Starts a Razorpay subscription checkout for the selected plan.")
     public ResponseEntity<ApiResponse<SubscriptionCheckoutResponse>> checkout(
         @PathVariable UUID organizationId,
         @Valid @RequestBody SelectPlanRequest request,
@@ -70,6 +77,7 @@ public class SubscriptionController {
 
 
     @PostMapping("/{subscriptionId}/verify")
+    @Operation(summary = "Verify subscription checkout", description = "Verifies checkout details. Subscription activation is completed asynchronously by the provider webhook.")
     public ResponseEntity<ApiResponse<Void>> verifyCheckout(
         @PathVariable UUID organizationId,
         @PathVariable UUID subscriptionId,
@@ -92,6 +100,7 @@ public class SubscriptionController {
     }
 
     @PostMapping("/cancel")
+    @Operation(summary = "Cancel subscription", description = "Schedules cancellation of the current organization subscription.")
     public ResponseEntity<ApiResponse<Void>> cancelSubscription(
         @PathVariable UUID organizationId,
         @AuthenticationPrincipal UserDetails userDetails

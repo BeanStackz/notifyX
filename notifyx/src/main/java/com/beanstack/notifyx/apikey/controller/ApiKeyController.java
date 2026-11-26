@@ -21,17 +21,23 @@ import com.beanstack.notifyx.apikey.dto.response.ApiKeyResponse;
 import com.beanstack.notifyx.apikey.service.ApiKeyService;
 import com.beanstack.notifyx.shared.response.ApiResponse;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/v1/organizations/{organizationId}/projects/{projectId}/api-keys")
 @RequiredArgsConstructor
+@Tag(name = "API keys", description = "Issue and manage project-scoped notification ingestion credentials.")
+@SecurityRequirement(name = "bearerAuth")
 public class ApiKeyController {
 
     private final ApiKeyService apiKeyService;
 
     @PostMapping
+    @Operation(summary = "Create API key", description = "Creates a project API key. The secret is returned only in this response; store it securely.")
     public ResponseEntity<ApiResponse<ApiKeyCreatedResponse>> createApiKey(
         @PathVariable UUID organizationId,
         @PathVariable UUID projectId,
@@ -50,6 +56,7 @@ public class ApiKeyController {
     }
 
     @GetMapping
+    @Operation(summary = "List API keys", description = "Lists API key metadata for a project. Secret key values are never returned.")
     public ResponseEntity<ApiResponse<List<ApiKeyResponse>>> getApiKeys(
         @PathVariable UUID organizationId,
         @PathVariable UUID projectId,
@@ -67,6 +74,7 @@ public class ApiKeyController {
     }
 
     @DeleteMapping("/{apiKeyId}")
+    @Operation(summary = "Revoke API key", description = "Revokes an API key belonging to the specified project.")
     public ResponseEntity<ApiResponse<ApiKeyResponse>> revokeApiKey(
         @PathVariable UUID organizationId,
         @PathVariable UUID projectId,
